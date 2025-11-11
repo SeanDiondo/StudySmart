@@ -17,7 +17,18 @@ Key features include:
 
 ## Recent Changes
 
-**November 11, 2025 - Bug Fixes & Stabilization**
+**November 11, 2025 - Admin User Management Enhancement**
+
+Added comprehensive user editing and deletion capabilities:
+
+**✅ New Features:**
+- **Edit User Details**: Admins can update user firstName, lastName, and email via dialog
+- **Delete Users**: Admins can delete users with confirmation dialog (cannot delete self)
+- **Input Validation**: Server-side validation for email format and non-empty names
+- **Improved Table Layout**: Fixed column widths for better alignment (Name: 200px, Email: 250px, Role: 120px, Joined: 150px)
+- **Enhanced Storage Interface**: Added `updateUser` and `deleteUser` methods to IStorage
+
+**Previous Update - November 11, 2025 - Bug Fixes & Stabilization**
 
 Fixed critical bugs preventing study plan creation:
 
