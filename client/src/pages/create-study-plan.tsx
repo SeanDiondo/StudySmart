@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ export default function CreateStudyPlan() {
   const totalSteps = 3;
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
+  const [, startTransition] = useTransition();
 
   // Fetch available subjects from backend
   const { data: subjects } = useQuery<Subject[]>({
@@ -62,20 +63,11 @@ export default function CreateStudyPlan() {
   const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
   const handleSubjectToggle = (subjectId: string) => {
-    setSelectedSubjects(prev => {
-      if (prev.includes(subjectId)) {
-        return prev.filter(s => s !== subjectId);
-      } else {
-        // Initialize with default values
-        if (!subjectHours[subjectId]) {
-          setSubjectHours(prev => ({ ...prev, [subjectId]: 3 }));
-        }
-        if (!subjectPriorities[subjectId]) {
-          setSubjectPriorities(prev => ({ ...prev, [subjectId]: 3 }));
-        }
-        return [...prev, subjectId];
-      }
-    });
+    setSelectedSubjects(prev =>
+      prev.includes(subjectId)
+        ? prev.filter(s => s !== subjectId)
+        : [...prev, subjectId]
+    );
   };
 
   const handleDayToggle = (day: string) => {
@@ -159,8 +151,7 @@ export default function CreateStudyPlan() {
                   >
                     <Checkbox
                       checked={selectedSubjects.includes(subject.id)}
-                      onCheckedChange={() => handleSubjectToggle(subject.id)}
-                      className="mt-0.5"
+                      className="mt-0.5 pointer-events-none"
                     />
                     <div>
                       <div className="font-medium">{subject.name}</div>
@@ -219,7 +210,7 @@ export default function CreateStudyPlan() {
                     >
                       <Checkbox
                         checked={availableDays.includes(day)}
-                        onCheckedChange={() => handleDayToggle(day)}
+                        className="pointer-events-none"
                       />
                       <Label className="cursor-pointer font-normal">{day}</Label>
                     </div>
