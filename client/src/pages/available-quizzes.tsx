@@ -4,65 +4,33 @@ import { Badge } from "@/components/ui/badge";
 import { Brain, Clock, FileQuestion, Plus } from "lucide-react";
 import { Link } from "wouter";
 import { EmptyState } from "@/components/empty-state";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
+import type { SelectQuiz, SelectSubject } from "@shared/schema";
+import { Skeleton } from "@/components/ui/skeleton";
+
+type QuizWithSubject = SelectQuiz & { subject?: Pick<SelectSubject, "name"> };
 
 export default function AvailableQuizzes() {
-  // Mock data
-  const availableQuizzes = [
-    {
-      id: "1",
-      title: "Data Structures Fundamentals",
-      subject: "Data Structures and Algorithms",
-      difficulty: "medium",
-      totalQuestions: 10,
-      estimatedMinutes: 30,
-      description: "Test your understanding of arrays, linked lists, stacks, and queues",
-    },
-    {
-      id: "2",
-      title: "React Hooks Deep Dive",
-      subject: "Web Development",
-      difficulty: "hard",
-      totalQuestions: 15,
-      estimatedMinutes: 45,
-      description: "Advanced concepts in useState, useEffect, and custom hooks",
-    },
-    {
-      id: "3",
-      title: "SQL Basics",
-      subject: "Database Systems",
-      difficulty: "easy",
-      totalQuestions: 12,
-      estimatedMinutes: 25,
-      description: "SELECT queries, WHERE clauses, and basic JOIN operations",
-    },
-    {
-      id: "4",
-      title: "Algorithm Complexity",
-      subject: "Data Structures and Algorithms",
-      difficulty: "medium",
-      totalQuestions: 8,
-      estimatedMinutes: 20,
-      description: "Big O notation, time complexity, and space complexity analysis",
-    },
-    {
-      id: "5",
-      title: "Network Fundamentals",
-      subject: "Computer Networks",
-      difficulty: "easy",
-      totalQuestions: 10,
-      estimatedMinutes: 20,
-      description: "OSI model, TCP/IP, and basic networking concepts",
-    },
-    {
-      id: "6",
-      title: "Advanced Database Design",
-      subject: "Database Systems",
-      difficulty: "hard",
-      totalQuestions: 12,
-      estimatedMinutes: 40,
-      description: "Normalization, indexing strategies, and query optimization",
-    },
-  ];
+  const { isAuthenticated } = useAuth();
+
+  const { data: quizzes, isLoading } = useQuery<QuizWithSubject[]>({
+    queryKey: ["/api/quizzes"],
+    enabled: isAuthenticated,
+  });
+
+  const { data: subjects } = useQuery<SelectSubject[]>({
+    queryKey: ["/api/subjects"],
+    enabled: isAuthenticated,
+  });
+
+  const quizzesWithSubjects = quizzes?.map(quiz => {
+    const subject = subjects?.find(s => s.id === quiz.subjectId);
+    return {
+      ...quiz,
+      subject: subject ? { name: subject.name } : undefined,
+    };
+  }) || [];
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
@@ -94,7 +62,22 @@ export default function AvailableQuizzes() {
       </div>
 
       {/* Quizzes Grid */}
-      {availableQuizzes.length === 0 ? (
+      {isLoading ? (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map(i => (
+            <Card key={i} className="flex flex-col">
+              <CardHeader>
+                <Skeleton className="h-6 w-3/4 mb-2" />
+                <Skeleton className="h-4 w-1/2" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : quizzesWithSubjects.length === 0 ? (
         <EmptyState
           icon={FileQuestion}
           title="No Quizzes Available"
@@ -104,16 +87,18 @@ export default function AvailableQuizzes() {
         />
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {availableQuizzes.map((quiz) => (
-            <Card key={quiz.id} className="hover-elevate flex flex-col">
+          {quizzesWithSubjects.map((quiz) => (
+            <Card key={quiz.id} className="hover-elevate flex flex-col" data-testid={`card-quiz-${quiz.id}`}>
               <CardHeader>
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 space-y-2">
                     <CardTitle className="text-lg leading-tight">{quiz.title}</CardTitle>
                     <div className="flex flex-wrap gap-2">
-                      <Badge variant="secondary" className="text-xs">
-                        {quiz.subject}
-                      </Badge>
+                      {quiz.subject && (
+                        <Badge variant="secondary" className="text-xs">
+                          {quiz.subject.name}
+                        </Badge>
+                      )}
                       <Badge variant="secondary" className={`text-xs ${getDifficultyColor(quiz.difficulty)}`}>
                         {quiz.difficulty}
                       </Badge>
@@ -125,19 +110,15 @@ export default function AvailableQuizzes() {
                 </div>
               </CardHeader>
               <CardContent className="flex-1 flex flex-col justify-between space-y-4">
-                <CardDescription className="line-clamp-2 leading-relaxed">
-                  {quiz.description}
-                </CardDescription>
-
                 <div className="space-y-3">
                   <div className="flex items-center justify-between text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <FileQuestion className="h-4 w-4" />
-                      <span>{quiz.totalQuestions} questions</span>
+                      <span>{quiz.questions.length} questions</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
-                      <span>{quiz.estimatedMinutes} min</span>
+                      <span>{Math.ceil(quiz.questions.length * 2)} min</span>
                     </div>
                   </div>
 

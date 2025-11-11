@@ -21,6 +21,7 @@ import PerformanceDashboard from "@/pages/performance-dashboard";
 import AdminMaterials from "@/pages/admin-materials";
 import MaterialsLibrary from "@/pages/materials-library";
 import AvailableQuizzes from "@/pages/available-quizzes";
+import GenerateQuiz from "@/pages/generate-quiz";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -52,6 +53,7 @@ function Router() {
           <Route path="/study-plans/new">{() => <ProtectedRoute><CreateStudyPlan /></ProtectedRoute>}</Route>
           <Route path="/quizzes">{() => <ProtectedRoute><AvailableQuizzes /></ProtectedRoute>}</Route>
           <Route path="/quizzes/available">{() => <ProtectedRoute><AvailableQuizzes /></ProtectedRoute>}</Route>
+          <Route path="/quiz/generate">{() => <ProtectedRoute><GenerateQuiz /></ProtectedRoute>}</Route>
           <Route path="/quiz/:id">{() => <ProtectedRoute><QuizInterface /></ProtectedRoute>}</Route>
           <Route path="/quiz/results/:id">{() => <ProtectedRoute><QuizResults /></ProtectedRoute>}</Route>
           <Route path="/performance">{() => <ProtectedRoute><PerformanceDashboard /></ProtectedRoute>}</Route>

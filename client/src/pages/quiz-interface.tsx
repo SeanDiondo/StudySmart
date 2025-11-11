@@ -1,52 +1,56 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Clock, ChevronLeft, ChevronRight, Flag } from "lucide-react";
-import { useLocation } from "wouter";
+import { useLocation, useRoute } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { SelectQuiz } from "@shared/schema";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
 
 export default function QuizInterface() {
   const [, setLocation] = useLocation();
+  const [, params] = useRoute("/quiz/:id");
+  const quizId = params?.id;
+  const { isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({});
-  const [timeRemaining, setTimeRemaining] = useState(1800); // 30 minutes in seconds
+  const [startTime] = useState(Date.now());
+  const timerInitialized = useRef(false);
 
-  // Mock quiz data
-  const quiz = {
-    id: "1",
-    title: "Data Structures Fundamentals",
-    subject: "Data Structures and Algorithms",
-    difficulty: "medium",
-    totalQuestions: 10,
-    estimatedMinutes: 30,
-  };
+  const { data: quiz, isLoading } = useQuery<SelectQuiz>({
+    queryKey: ["/api/quizzes", quizId],
+    enabled: isAuthenticated && !!quizId,
+  });
 
-  const questions = [
-    {
-      id: "q1",
-      text: "What is the time complexity of inserting an element at the beginning of an array?",
-      type: "multiple_choice",
-      options: ["O(1)", "O(n)", "O(log n)", "O(n²)"],
-      correctAnswer: "O(n)",
-    },
-    {
-      id: "q2",
-      text: "Which data structure follows the LIFO (Last In First Out) principle?",
-      type: "multiple_choice",
-      options: ["Queue", "Stack", "Array", "Linked List"],
-      correctAnswer: "Stack",
-    },
-    // More questions would be here
-  ];
+  const questions = quiz?.questions || [];
+  const [timeRemaining, setTimeRemaining] = useState(0);
 
-  // Timer effect
+  // Initialize timer when quiz loads
   useEffect(() => {
+    if (quiz && questions.length > 0 && !timerInitialized.current) {
+      const estimatedMinutes = questions.length * 2;
+      setTimeRemaining(estimatedMinutes * 60);
+      timerInitialized.current = true;
+    }
+  }, [quiz, questions.length]);
+
+  // Timer effect - only runs after initialization
+  useEffect(() => {
+    if (!timerInitialized.current) return; // Don't run until timer is initialized
+    
     if (timeRemaining > 0) {
       const timer = setTimeout(() => setTimeRemaining(timeRemaining - 1), 1000);
       return () => clearTimeout(timer);
-    } else {
+    } else if (timeRemaining === 0) {
       handleSubmit();
     }
   }, [timeRemaining]);
@@ -73,21 +77,91 @@ export default function QuizInterface() {
     }
   };
 
+  const submitMutation = useMutation({
+    mutationFn: async () => {
+      const timeSpentMinutes = Math.ceil((Date.now() - startTime) / 60000);
+      
+      const answers = questions.map((question, index) => ({
+        questionIndex: index,
+        userAnswer: selectedAnswers[index] || "",
+        isCorrect: selectedAnswers[index] === question.correctAnswer,
+      }));
+
+      const correctAnswers = answers.filter(a => a.isCorrect).length;
+      const score = Math.round((correctAnswers / questions.length) * 100);
+
+      const payload = {
+        quizId: quiz!.id,
+        score,
+        totalQuestions: questions.length,
+        correctAnswers,
+        timeSpentMinutes,
+        answers,
+      };
+
+      const res = await apiRequest("POST", "/api/quiz-attempts", payload);
+      return await res.json();
+    },
+    onSuccess: (attempt) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quiz-attempts"] });
+      setLocation(`/quiz/results/${attempt.id}`);
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Submission Failed",
+        description: error.message || "Failed to submit quiz. Please try again.",
+      });
+    },
+  });
+
   const handleSubmit = () => {
-    // Calculate score and submit
-    setLocation("/quiz/results/1");
+    if (!quiz || submitMutation.isPending) return; // Guard against premature submission
+    submitMutation.mutate();
   };
 
-  const progress = ((currentQuestion + 1) / questions.length) * 100;
+  const progress = questions.length > 0 ? ((currentQuestion + 1) / questions.length) * 100 : 0;
   const answeredCount = Object.keys(selectedAnswers).length;
+
+  if (isLoading) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-8 w-3/4 mb-2" />
+            <Skeleton className="h-4 w-1/2" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!quiz) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Quiz Not Found</CardTitle>
+          <CardDescription>The requested quiz could not be found.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={() => setLocation("/quizzes")}>Back to Quizzes</Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold font-display">{quiz.title}</h1>
-          <p className="text-muted-foreground">{quiz.subject}</p>
+          <h1 className="text-2xl md:text-3xl font-bold font-display" data-testid="text-quiz-title">{quiz.title}</h1>
+          <Badge variant="secondary" className="mt-1">{quiz.difficulty}</Badge>
         </div>
         <div className="flex items-center gap-2 px-4 py-2 bg-card border rounded-lg">
           <Clock className="h-5 w-5 text-primary" />
@@ -113,8 +187,8 @@ export default function QuizInterface() {
       {/* Question Card */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl leading-relaxed">
-            {questions[currentQuestion].text}
+          <CardTitle className="text-xl leading-relaxed" data-testid="text-question">
+            {questions[currentQuestion].questionText}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -122,6 +196,7 @@ export default function QuizInterface() {
             value={selectedAnswers[currentQuestion] || ""}
             onValueChange={handleAnswerSelect}
             className="space-y-3"
+            data-testid="radiogroup-answers"
           >
             {questions[currentQuestion].options.map((option, index) => (
               <div
