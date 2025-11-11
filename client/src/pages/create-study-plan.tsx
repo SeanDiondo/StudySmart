@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Check } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Calendar, Clock, Target, ChevronRight, ChevronLeft } from "lucide-react";
 import { useLocation } from "wouter";
@@ -149,13 +149,20 @@ export default function CreateStudyPlan() {
                     onClick={() => handleSubjectToggle(subject.id)}
                     data-testid={`checkbox-subject-${subject.name.toLowerCase().replace(/\s+/g, "-")}`}
                   >
-                    <Checkbox
-                      checked={selectedSubjects.includes(subject.id)}
-                      className="mt-0.5 pointer-events-none"
-                    />
+                    <div className={`h-5 w-5 rounded border-2 mt-0.5 flex items-center justify-center ${
+                      selectedSubjects.includes(subject.id) 
+                        ? "bg-primary border-primary" 
+                        : "border-input"
+                    }`}>
+                      {selectedSubjects.includes(subject.id) && (
+                        <Check className="h-3 w-3 text-primary-foreground" />
+                      )}
+                    </div>
                     <div>
                       <div className="font-medium">{subject.name}</div>
-                      <div className="text-sm text-muted-foreground">{subject.code}</div>
+                      {subject.description && (
+                        <div className="text-sm text-muted-foreground">{subject.description}</div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -208,10 +215,15 @@ export default function CreateStudyPlan() {
                       onClick={() => handleDayToggle(day)}
                       data-testid={`checkbox-day-${day.toLowerCase()}`}
                     >
-                      <Checkbox
-                        checked={availableDays.includes(day)}
-                        className="pointer-events-none"
-                      />
+                      <div className={`h-5 w-5 rounded border-2 flex items-center justify-center ${
+                        availableDays.includes(day) 
+                          ? "bg-primary border-primary" 
+                          : "border-input"
+                      }`}>
+                        {availableDays.includes(day) && (
+                          <Check className="h-3 w-3 text-primary-foreground" />
+                        )}
+                      </div>
                       <Label className="cursor-pointer font-normal">{day}</Label>
                     </div>
                   ))}
