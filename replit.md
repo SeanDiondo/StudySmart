@@ -17,7 +17,27 @@ Key features include:
 
 ## Recent Changes
 
-**November 11, 2025 - Admin User Management Enhancement**
+**November 11, 2025 - Google Calendar-Style Weekly Schedule Interface**
+
+Replaced simple day checkboxes with an interactive weekly calendar for study plan creation:
+
+**✅ New Features:**
+- **Google Calendar-Style Grid**: Visual weekly calendar showing time slots from 6 AM to 11 PM for each day
+- **Click-to-Select Interface**: Click any time block to select/deselect availability hours
+- **Real-Time Hours Counter**: Shows total hours selected with automatic calculation
+- **Non-Contiguous Time Preservation**: Properly preserves gaps (e.g., 9-10 AM and 3-4 PM saved as separate blocks, not collapsed)
+- **Visual Feedback**: Selected blocks highlight with checkmark and primary color
+- **Clear All Button**: Quick reset of all selections
+- **Responsive Design**: Mobile-friendly with abbreviated day names
+
+**Technical Implementation:**
+- Time slots stored as key-value pairs: `{ "monday-09:00": true, "tuesday-14:00": true }`
+- Contiguous block grouping algorithm preserves gaps between non-adjacent hours
+- EndTime calculated as one hour after last selected block
+- Step 3 summary synchronized with calendar selections (days/hours derived from selectedTimeSlots state)
+- React key warnings resolved using `contents` className for grid fragments
+
+**Previous Update - November 11, 2025 - Admin User Management Enhancement**
 
 Added comprehensive user editing and deletion capabilities:
 
