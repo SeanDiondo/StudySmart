@@ -12,9 +12,58 @@ import {
   insertQuizSchema,
   insertQuizAttemptSchema,
 } from "@shared/schema";
+import bcrypt from "bcrypt";
+import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
+
+  // Password login endpoint for testing
+  const passwordLoginSchema = z.object({
+    email: z.string().email(),
+    password: z.string().min(1),
+  });
+
+  app.post("/api/auth/password-login", async (req: any, res) => {
+    try {
+      const { email, password } = passwordLoginSchema.parse(req.body);
+      
+      const user = await storage.getUserByEmail(email);
+      if (!user || !user.password) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      // Create session manually (same format as Replit Auth)
+      const sessionUser = {
+        claims: {
+          sub: user.id,
+          email: user.email,
+          first_name: user.firstName,
+          last_name: user.lastName,
+        },
+        expires_at: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 days
+      };
+
+      req.login(sessionUser, (err) => {
+        if (err) {
+          console.error("Login error:", err);
+          return res.status(500).json({ message: "Failed to create session" });
+        }
+        res.json({ success: true, user });
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request", errors: error.errors });
+      }
+      console.error("Password login error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
 
   // Auth routes
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {

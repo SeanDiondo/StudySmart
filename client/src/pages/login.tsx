@@ -4,15 +4,38 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Brain } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function Login() {
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Will be connected to backend
+    setIsLoading(true);
+
+    try {
+      await apiRequest("/api/auth/password-login", "POST", { email, password });
+      toast({
+        title: "Login successful",
+        description: "Welcome back!",
+      });
+      setLocation("/dashboard");
+      window.location.reload(); // Reload to refresh auth state
+    } catch (error: any) {
+      toast({
+        title: "Login failed",
+        description: error.message || "Invalid email or password",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -67,18 +90,30 @@ export default function Login() {
                   data-testid="input-password"
                 />
               </div>
-              <Button type="submit" className="w-full" size="lg" data-testid="button-login-submit">
-                Sign In
+              <Button type="submit" className="w-full" size="lg" disabled={isLoading} data-testid="button-login-submit">
+                {isLoading ? "Signing in..." : "Sign In"}
               </Button>
             </form>
 
-            <div className="mt-6 text-center text-sm">
-              <span className="text-muted-foreground">Don't have an account? </span>
-              <Link href="/signup">
-                <span className="text-primary font-medium hover:underline cursor-pointer" data-testid="link-signup">
-                  Sign up
-                </span>
-              </Link>
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+              </div>
+            </div>
+
+            <a href="/api/login" className="block">
+              <Button variant="outline" className="w-full" size="lg" data-testid="button-replit-auth">
+                Replit Auth
+              </Button>
+            </a>
+
+            <div className="mt-4 p-3 bg-muted/50 rounded-md text-xs space-y-1">
+              <p className="font-semibold text-foreground">Test Credentials:</p>
+              <p className="text-muted-foreground">Student: student@test.com / Study123!</p>
+              <p className="text-muted-foreground">Admin: admin@test.com / Admin123!</p>
             </div>
           </CardContent>
         </Card>
