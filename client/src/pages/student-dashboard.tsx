@@ -41,6 +41,10 @@ export default function StudentDashboard() {
   const isLoading = planLoading;
   const hasStudyPlan = studyPlans && studyPlans.length > 0;
 
+  // Calculate active study plans
+  const activePlansCount = studyPlans?.filter(plan => plan.isActive).length || 0;
+  const totalPlansCount = studyPlans?.length || 0;
+
   // Calculate stats from real data
   const quizzesCompleted = quizAttempts?.length || 0;
   const averageScore = quizAttempts?.length 
@@ -48,7 +52,7 @@ export default function StudentDashboard() {
     : 0;
 
   const stats = [
-    { label: "Study Plan Status", value: hasStudyPlan ? "Active" : "None", icon: BookOpen, color: "text-primary" },
+    { label: "Active Study Plans", value: `${activePlansCount} / ${totalPlansCount}`, icon: BookOpen, color: "text-primary" },
     { label: "Quizzes Completed", value: String(quizzesCompleted), icon: Brain, color: "text-chart-2" },
     { label: "Average Score", value: `${averageScore}%`, icon: TrendingUp, color: "text-chart-1" },
   ];
@@ -129,10 +133,15 @@ export default function StudentDashboard() {
       {/* Your Study Plans */}
       {studyPlans && studyPlans.length > 0 && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold font-display">
-              Your Study Plans ({studyPlans.length})
-            </h2>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-semibold font-display">
+                Your Study Plans
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {activePlansCount} active {activePlansCount === 1 ? 'plan' : 'plans'} out of {totalPlansCount} total
+              </p>
+            </div>
             <Link href="/study-plans/new">
               <Button variant="ghost" data-testid="link-edit-plan">
                 Create New Plan
