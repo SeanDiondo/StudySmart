@@ -45,6 +45,7 @@ export interface IStorage {
   
   // Study Plan operations
   getStudyPlan(userId: string): Promise<StudyPlan | undefined>;
+  getAllStudyPlans(userId: string): Promise<StudyPlan[]>;
   getStudyPlanById(planId: string): Promise<StudyPlan | undefined>;
   createStudyPlan(plan: InsertStudyPlan): Promise<StudyPlan>;
   updateStudyPlan(id: string, plan: Partial<InsertStudyPlan>): Promise<StudyPlan>;
@@ -165,8 +166,12 @@ export class DatabaseStorage implements IStorage {
 
   // Study Plan operations
   async getStudyPlan(userId: string): Promise<StudyPlan | undefined> {
-    const [plan] = await db.select().from(studyPlans).where(eq(studyPlans.userId, userId));
+    const [plan] = await db.select().from(studyPlans).where(eq(studyPlans.userId, userId)).orderBy(desc(studyPlans.createdAt));
     return plan || undefined;
+  }
+
+  async getAllStudyPlans(userId: string): Promise<StudyPlan[]> {
+    return await db.select().from(studyPlans).where(eq(studyPlans.userId, userId)).orderBy(desc(studyPlans.createdAt));
   }
 
   async getStudyPlanById(planId: string): Promise<StudyPlan | undefined> {
