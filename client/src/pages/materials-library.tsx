@@ -123,9 +123,9 @@ export default function MaterialsLibrary() {
                   asChild
                   data-testid={`button-download-${material.id}`}
                 >
-                  <a href={material.url} target="_blank" rel="noopener noreferrer">
+                  <a href={material.fileUrl} download={material.fileName}>
                     <Download className="h-4 w-4 mr-2" />
-                    Download PDF
+                    Download
                   </a>
                 </Button>
               </CardContent>
