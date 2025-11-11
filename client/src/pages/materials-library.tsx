@@ -12,77 +12,36 @@ import {
 } from "@/components/ui/select";
 import { FileText, Download, Search } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
+import type { StudyMaterial, Subject } from "@shared/schema";
 
 export default function MaterialsLibrary() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSubject, setSelectedSubject] = useState<string>("all");
+  const { isAuthenticated } = useAuth();
 
-  // Mock data
-  const materials = [
-    {
-      id: "1",
-      title: "Introduction to Data Structures",
-      description: "Comprehensive guide covering arrays, linked lists, stacks, and queues",
-      subject: "Data Structures and Algorithms",
-      fileName: "data-structures-intro.pdf",
-      fileSize: 2.4,
-      uploadedAt: "2024-01-15",
-    },
-    {
-      id: "2",
-      title: "React Fundamentals Guide",
-      description: "Complete guide to React components, hooks, and state management",
-      subject: "Web Development",
-      fileName: "react-fundamentals.pdf",
-      fileSize: 3.1,
-      uploadedAt: "2024-01-14",
-    },
-    {
-      id: "3",
-      title: "SQL Query Optimization",
-      description: "Techniques for writing efficient database queries and indexes",
-      subject: "Database Systems",
-      fileName: "sql-optimization.pdf",
-      fileSize: 1.8,
-      uploadedAt: "2024-01-13",
-    },
-    {
-      id: "4",
-      title: "Algorithm Design Patterns",
-      description: "Common algorithmic patterns and problem-solving strategies",
-      subject: "Data Structures and Algorithms",
-      fileName: "algorithm-patterns.pdf",
-      fileSize: 2.9,
-      uploadedAt: "2024-01-12",
-    },
-    {
-      id: "5",
-      title: "Network Protocols Overview",
-      description: "Deep dive into TCP/IP, HTTP, and other essential protocols",
-      subject: "Computer Networks",
-      fileName: "network-protocols.pdf",
-      fileSize: 2.2,
-      uploadedAt: "2024-01-11",
-    },
-    {
-      id: "6",
-      title: "Operating Systems Concepts",
-      description: "Process management, memory allocation, and file systems",
-      subject: "Operating Systems",
-      fileName: "os-concepts.pdf",
-      fileSize: 3.5,
-      uploadedAt: "2024-01-10",
-    },
-  ];
+  // Fetch materials from backend
+  const { data: materials } = useQuery<StudyMaterial[]>({
+    queryKey: ["/api/study-materials"],
+    enabled: isAuthenticated,
+  });
 
-  const subjects = Array.from(new Set(materials.map((m) => m.subject))).sort();
+  // Fetch subjects for filtering
+  const { data: subjects } = useQuery<Subject[]>({
+    queryKey: ["/api/subjects"],
+    enabled: isAuthenticated,
+  });
 
-  const filteredMaterials = materials.filter((material) => {
+  const materialsData = materials || [];
+  const subjectsData = subjects || [];
+
+  const filteredMaterials = materialsData.filter((material) => {
     const matchesSearch =
       material.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      material.description.toLowerCase().includes(searchQuery.toLowerCase());
+      (material.description && material.description.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesSubject =
-      selectedSubject === "all" || material.subject === selectedSubject;
+      selectedSubject === "all" || material.subjectId === selectedSubject;
     return matchesSearch && matchesSubject;
   });
 
@@ -112,9 +71,9 @@ export default function MaterialsLibrary() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Subjects</SelectItem>
-            {subjects.map((subject) => (
-              <SelectItem key={subject} value={subject}>
-                {subject}
+            {subjectsData.map((subject) => (
+              <SelectItem key={subject.id} value={subject.id}>
+                {subject.name}
               </SelectItem>
             ))}
           </SelectContent>
@@ -142,7 +101,7 @@ export default function MaterialsLibrary() {
                   <div className="flex-1 space-y-1">
                     <CardTitle className="text-lg leading-tight">{material.title}</CardTitle>
                     <Badge variant="secondary" className="text-xs">
-                      {material.subject}
+                      {subjectsData.find(s => s.id === material.subjectId)?.name || material.subjectId}
                     </Badge>
                   </div>
                   <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -156,13 +115,18 @@ export default function MaterialsLibrary() {
                 </CardDescription>
 
                 <div className="flex items-center justify-between text-sm text-muted-foreground">
-                  <span>{material.fileSize} MB</span>
-                  <span>{new Date(material.uploadedAt).toLocaleDateString()}</span>
+                  <span>{material.uploadedAt ? new Date(material.uploadedAt).toLocaleDateString() : 'N/A'}</span>
                 </div>
 
-                <Button className="w-full" data-testid={`button-download-${material.id}`}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Download PDF
+                <Button 
+                  className="w-full" 
+                  asChild
+                  data-testid={`button-download-${material.id}`}
+                >
+                  <a href={material.url} target="_blank" rel="noopener noreferrer">
+                    <Download className="h-4 w-4 mr-2" />
+                    Download PDF
+                  </a>
                 </Button>
               </CardContent>
             </Card>

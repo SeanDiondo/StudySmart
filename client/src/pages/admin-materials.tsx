@@ -30,65 +30,96 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Upload, FileText, Trash2, Pencil, Plus, Search } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import type { StudyMaterial, Subject } from "@shared/schema";
 
 export default function AdminMaterials() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadForm, setUploadForm] = useState({
+    title: "",
+    description: "",
+    subjectId: "",
+    url: "",
+  });
+  const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
 
-  // Mock data
-  const materials = [
-    {
-      id: "1",
-      title: "Introduction to Data Structures",
-      subject: "Data Structures and Algorithms",
-      fileName: "data-structures-intro.pdf",
-      fileSize: 2.4,
-      uploadedAt: "2024-01-15",
-    },
-    {
-      id: "2",
-      title: "React Fundamentals Guide",
-      subject: "Web Development",
-      fileName: "react-fundamentals.pdf",
-      fileSize: 3.1,
-      uploadedAt: "2024-01-14",
-    },
-    {
-      id: "3",
-      title: "SQL Query Optimization",
-      subject: "Database Systems",
-      fileName: "sql-optimization.pdf",
-      fileSize: 1.8,
-      uploadedAt: "2024-01-13",
-    },
-  ];
+  // Fetch materials from backend
+  const { data: materials } = useQuery<StudyMaterial[]>({
+    queryKey: ["/api/study-materials"],
+    enabled: isAuthenticated,
+  });
 
-  const subjects = [
-    "Programming Fundamentals",
-    "Data Structures and Algorithms",
-    "Database Systems",
-    "Web Development",
-    "Software Engineering",
-  ];
+  // Fetch subjects for dropdown
+  const { data: subjects } = useQuery<Subject[]>({
+    queryKey: ["/api/subjects"],
+    enabled: isAuthenticated,
+  });
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
-    }
-  };
+  // Upload material mutation
+  const uploadMutation = useMutation({
+    mutationFn: async (data: typeof uploadForm) => {
+      const res = await apiRequest("POST", "/api/study-materials", data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/study-materials"] });
+      toast({
+        title: "Success!",
+        description: "Material uploaded successfully",
+      });
+      setIsUploadDialogOpen(false);
+      setUploadForm({ title: "", description: "", subjectId: "", url: "" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to upload material",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete material mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/study-materials/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/study-materials"] });
+      toast({
+        title: "Success!",
+        description: "Material deleted successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete material",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleUpload = (e: React.FormEvent) => {
     e.preventDefault();
-    // Will be connected to backend
-    setIsUploadDialogOpen(false);
-    setSelectedFile(null);
+    uploadMutation.mutate(uploadForm);
   };
 
-  const filteredMaterials = materials.filter(
+  const handleDelete = (id: string) => {
+    if (confirm("Are you sure you want to delete this material?")) {
+      deleteMutation.mutate(id);
+    }
+  };
+
+  const filteredMaterials = (materials || []).filter(
     (material) =>
       material.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      material.subject.toLowerCase().includes(searchQuery.toLowerCase())
+      (material.description && material.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   return (
@@ -120,20 +151,22 @@ export default function AdminMaterials() {
                   id="title"
                   placeholder="e.g., Introduction to Algorithms"
                   required
+                  value={uploadForm.title}
+                  onChange={(e) => setUploadForm({ ...uploadForm, title: e.target.value })}
                   data-testid="input-material-title"
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="subject">Subject</Label>
-                <Select required>
+                <Select required value={uploadForm.subjectId} onValueChange={(value) => setUploadForm({ ...uploadForm, subjectId: value })}>
                   <SelectTrigger id="subject" data-testid="select-material-subject">
                     <SelectValue placeholder="Select a subject" />
                   </SelectTrigger>
                   <SelectContent>
-                    {subjects.map((subject) => (
-                      <SelectItem key={subject} value={subject}>
-                        {subject}
+                    {(subjects || []).map((subject) => (
+                      <SelectItem key={subject.id} value={subject.id}>
+                        {subject.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -146,45 +179,24 @@ export default function AdminMaterials() {
                   id="description"
                   placeholder="Brief description of the material contents..."
                   rows={3}
+                  value={uploadForm.description}
+                  onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value })}
                   data-testid="textarea-material-description"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="file">PDF File</Label>
-                <div className="border-2 border-dashed rounded-lg p-8 text-center hover-elevate">
-                  <input
-                    type="file"
-                    id="file"
-                    accept=".pdf"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                    required
-                    data-testid="input-file-upload"
-                  />
-                  <label htmlFor="file" className="cursor-pointer">
-                    {selectedFile ? (
-                      <div className="space-y-2">
-                        <FileText className="h-12 w-12 text-primary mx-auto" />
-                        <div className="font-medium">{selectedFile.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                        </div>
-                        <Button type="button" variant="outline" size="sm">
-                          Change File
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <Upload className="h-12 w-12 text-muted-foreground mx-auto" />
-                        <div className="font-medium">Click to upload PDF</div>
-                        <div className="text-sm text-muted-foreground">
-                          Max file size: 10MB
-                        </div>
-                      </div>
-                    )}
-                  </label>
-                </div>
+                <Label htmlFor="url">Material URL</Label>
+                <Input
+                  id="url"
+                  type="url"
+                  placeholder="https://example.com/document.pdf"
+                  required
+                  value={uploadForm.url}
+                  onChange={(e) => setUploadForm({ ...uploadForm, url: e.target.value })}
+                  data-testid="input-material-url"
+                />
+                <p className="text-sm text-muted-foreground">Enter the URL of the study material (PDF or document link)</p>
               </div>
 
               <div className="flex justify-end gap-3 pt-4">
@@ -236,8 +248,8 @@ export default function AdminMaterials() {
                 <TableRow>
                   <TableHead>Title</TableHead>
                   <TableHead>Subject</TableHead>
-                  <TableHead>File Name</TableHead>
-                  <TableHead>Size</TableHead>
+                  <TableHead>URL</TableHead>
+                  <TableHead>Description</TableHead>
                   <TableHead>Uploaded</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -247,27 +259,25 @@ export default function AdminMaterials() {
                   <TableRow key={material.id}>
                     <TableCell className="font-medium">{material.title}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary">{material.subject}</Badge>
+                      <Badge variant="secondary">
+                        {(subjects || []).find(s => s.id === material.subjectId)?.name || material.subjectId}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {material.fileName}
+                      {material.url}
                     </TableCell>
-                    <TableCell>{material.fileSize} MB</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {new Date(material.uploadedAt).toLocaleDateString()}
+                      {material.description || 'No description'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {material.uploadedAt ? new Date(material.uploadedAt).toLocaleDateString() : 'N/A'}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
                         <Button
                           variant="ghost"
                           size="icon"
-                          data-testid={`button-edit-${material.id}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
+                          onClick={() => handleDelete(material.id)}
                           data-testid={`button-delete-${material.id}`}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />

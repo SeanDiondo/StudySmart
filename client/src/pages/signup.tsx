@@ -102,9 +102,9 @@ export default function Signup() {
             <div className="mt-6 text-center text-sm">
               <span className="text-muted-foreground">Already have an account? </span>
               <Link href="/login">
-                <a className="text-primary font-medium hover:underline" data-testid="link-login">
+                <span className="text-primary font-medium hover:underline cursor-pointer" data-testid="link-login">
                   Sign in
-                </a>
+                </span>
               </Link>
             </div>
           </CardContent>

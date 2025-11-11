@@ -52,9 +52,9 @@ export default function Login() {
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">Password</Label>
                   <Link href="/forgot-password">
-                    <a className="text-sm text-primary hover:underline" data-testid="link-forgot-password">
+                    <span className="text-sm text-primary hover:underline cursor-pointer" data-testid="link-forgot-password">
                       Forgot password?
-                    </a>
+                    </span>
                   </Link>
                 </div>
                 <Input
@@ -75,9 +75,9 @@ export default function Login() {
             <div className="mt-6 text-center text-sm">
               <span className="text-muted-foreground">Don't have an account? </span>
               <Link href="/signup">
-                <a className="text-primary font-medium hover:underline" data-testid="link-signup">
+                <span className="text-primary font-medium hover:underline cursor-pointer" data-testid="link-signup">
                   Sign up
-                </a>
+                </span>
               </Link>
             </div>
           </CardContent>

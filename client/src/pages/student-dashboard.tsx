@@ -6,54 +6,63 @@ import { Calendar, Clock, TrendingUp, TrendingDown, BookOpen, Brain, Plus } from
 import { Link } from "wouter";
 import { LoadingSkeleton } from "@/components/loading-spinner";
 import { EmptyState } from "@/components/empty-state";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
+import type { StudyPlan, QuizAttempt, PerformanceData } from "@shared/schema";
 
 export default function StudentDashboard() {
-  // Mock data - will be replaced with real data
-  const hasStudyPlans = true;
-  const isLoading = false;
+  const { isAuthenticated } = useAuth();
+
+  const { data: studyPlan, isLoading: planLoading } = useQuery<StudyPlan>({
+    queryKey: ["/api/study-plans"],
+    enabled: isAuthenticated,
+  });
+
+  const { data: quizAttempts } = useQuery<QuizAttempt[]>({
+    queryKey: ["/api/quiz-attempts"],
+    enabled: isAuthenticated,
+  });
+
+  const { data: performance } = useQuery<PerformanceData[]>({
+    queryKey: ["/api/performance"],
+    enabled: isAuthenticated,
+  });
+
+  const { data: studyPlanSubjects } = useQuery<any[]>({
+    queryKey: ["/api/study-plans", studyPlan?.id, "subjects"],
+    enabled: isAuthenticated && !!studyPlan?.id,
+  });
+
+  const isLoading = planLoading;
+  const hasStudyPlan = !!studyPlan;
+
+  // Calculate stats from real data
+  const quizzesCompleted = quizAttempts?.length || 0;
+  const averageScore = quizAttempts?.length 
+    ? Math.round(quizAttempts.reduce((sum, attempt) => sum + (attempt.score || 0), 0) / quizAttempts.length)
+    : 0;
 
   const stats = [
-    { label: "Active Study Plans", value: "3", icon: BookOpen, color: "text-primary" },
-    { label: "Quizzes Completed", value: "12", icon: Brain, color: "text-chart-2" },
-    { label: "Average Score", value: "85%", icon: TrendingUp, color: "text-chart-1" },
+    { label: "Study Plan Status", value: hasStudyPlan ? "Active" : "None", icon: BookOpen, color: "text-primary" },
+    { label: "Quizzes Completed", value: String(quizzesCompleted), icon: Brain, color: "text-chart-2" },
+    { label: "Average Score", value: `${averageScore}%`, icon: TrendingUp, color: "text-chart-1" },
   ];
 
-  const studyPlans = [
-    {
-      id: "1",
-      subject: "Data Structures and Algorithms",
-      progress: 65,
-      nextSession: "Today, 2:00 PM",
-      hoursThisWeek: 8,
-      totalHours: 12,
-    },
-    {
-      id: "2",
-      subject: "Web Development",
-      progress: 45,
-      nextSession: "Tomorrow, 10:00 AM",
-      hoursThisWeek: 5,
-      totalHours: 10,
-    },
-    {
-      id: "3",
-      subject: "Database Systems",
-      progress: 80,
-      nextSession: "Wednesday, 3:00 PM",
-      hoursThisWeek: 10,
-      totalHours: 12,
-    },
-  ];
+  // Get recent quiz attempts (last 5)
+  const recentQuizzes = (quizAttempts || [])
+    .sort((a, b) => new Date(b.submittedAt || b.startedAt).getTime() - new Date(a.submittedAt || a.startedAt).getTime())
+    .slice(0, 5);
 
-  const recentQuizzes = [
-    { id: "1", subject: "Data Structures", score: 90, date: "2 days ago", difficulty: "medium" },
-    { id: "2", subject: "Web Development", score: 75, date: "5 days ago", difficulty: "easy" },
-    { id: "3", subject: "Database Systems", score: 95, date: "1 week ago", difficulty: "hard" },
-  ];
-
+  // Get performance insights from performance data
   const performanceInsights = {
-    strengths: ["Problem Solving", "Algorithm Design", "SQL Queries"],
-    weaknesses: ["Time Complexity", "CSS Styling", "React Hooks"],
+    strengths: (performance || [])
+      .filter(p => p.category === 'strength')
+      .map(p => p.area)
+      .slice(0, 5),
+    weaknesses: (performance || [])
+      .filter(p => p.category === 'weakness')
+      .map(p => p.area)
+      .slice(0, 5),
   };
 
   if (isLoading) {
@@ -69,12 +78,12 @@ export default function StudentDashboard() {
     );
   }
 
-  if (!hasStudyPlans && !isLoading) {
+  if (!hasStudyPlan && !isLoading) {
     return (
       <div className="py-12">
         <EmptyState
           icon={BookOpen}
-          title="No Study Plans Yet"
+          title="No Study Plan Yet"
           description="Create your first personalized study plan to start your learning journey"
           actionLabel="Create Study Plan"
           onAction={() => window.location.href = "/study-plans/new"}
@@ -114,55 +123,55 @@ export default function StudentDashboard() {
         ))}
       </div>
 
-      {/* Study Plans */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-semibold font-display">Active Study Plans</h2>
-          <Link href="/study-plans">
-            <Button variant="ghost" data-testid="link-view-all-plans">
-              View All
-            </Button>
-          </Link>
-        </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {studyPlans.map((plan) => (
-            <Card key={plan.id} className="hover-elevate">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <CardTitle className="text-lg">{plan.subject}</CardTitle>
-                    <CardDescription className="flex items-center gap-1 text-sm">
-                      <Clock className="h-3 w-3" />
-                      {plan.hoursThisWeek}/{plan.totalHours} hours this week
-                    </CardDescription>
-                  </div>
-                  <Badge variant="secondary" className="text-xs">
-                    {plan.progress}%
-                  </Badge>
+      {/* Your Study Plan */}
+      {studyPlan && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-semibold font-display">Your Study Plan</h2>
+            <Link href="/study-plans/new">
+              <Button variant="ghost" data-testid="link-edit-plan">
+                Edit Plan
+              </Button>
+            </Link>
+          </div>
+          <Card className="hover-elevate">
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <div className="space-y-1">
+                  <CardTitle className="text-lg">Weekly Study Schedule</CardTitle>
+                  <CardDescription className="flex items-center gap-1 text-sm">
+                    <Clock className="h-3 w-3" />
+                    {studyPlan.hoursPerWeek} hours per week
+                  </CardDescription>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
+                <Badge variant="secondary" className="text-xs">
+                  {studyPlan.learningPace} pace
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {studyPlanSubjects && studyPlanSubjects.length > 0 ? (
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Progress</span>
-                    <span className="font-medium">{plan.progress}%</span>
+                  <h4 className="font-medium text-sm text-muted-foreground">Subjects</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {studyPlanSubjects.map((subject: any) => (
+                      <Badge key={subject.id} variant="outline" className="text-xs">
+                        {subject.subjectName || subject.subjectId}
+                      </Badge>
+                    ))}
                   </div>
-                  <Progress value={plan.progress} className="h-2" />
                 </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  Next: {plan.nextSession}
+              ) : null}
+              {studyPlan.learningGoals && (
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm text-muted-foreground">Learning Goals</h4>
+                  <p className="text-sm">{studyPlan.learningGoals}</p>
                 </div>
-                <Link href={`/study-plans/${plan.id}`}>
-                  <Button variant="outline" className="w-full" data-testid={`button-view-plan-${plan.id}`}>
-                    View Details
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          ))}
+              )}
+            </CardContent>
+          </Card>
         </div>
-      </div>
+      )}
 
       {/* Recent Quizzes and Performance */}
       <div className="grid lg:grid-cols-2 gap-6">
@@ -179,22 +188,31 @@ export default function StudentDashboard() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {recentQuizzes.map((quiz) => (
-              <div key={quiz.id} className="flex items-center justify-between p-4 rounded-lg border hover-elevate">
-                <div className="space-y-1">
-                  <div className="font-medium">{quiz.subject}</div>
-                  <div className="text-sm text-muted-foreground">{quiz.date}</div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Badge variant={quiz.difficulty === "hard" ? "default" : quiz.difficulty === "medium" ? "secondary" : "outline"}>
-                    {quiz.difficulty}
-                  </Badge>
-                  <div className={`text-2xl font-bold ${quiz.score >= 80 ? "text-chart-2" : quiz.score >= 60 ? "text-chart-4" : "text-destructive"}`}>
-                    {quiz.score}%
-                  </div>
-                </div>
+            {recentQuizzes.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No quizzes completed yet</p>
+                <p className="text-sm mt-1">Start learning by taking your first quiz</p>
               </div>
-            ))}
+            ) : (
+              recentQuizzes.map((attempt) => {
+                const score = attempt.score || 0;
+                const dateStr = attempt.submittedAt 
+                  ? new Date(attempt.submittedAt).toLocaleDateString()
+                  : new Date(attempt.startedAt).toLocaleDateString();
+                
+                return (
+                  <div key={attempt.id} className="flex items-center justify-between p-4 rounded-lg border hover-elevate">
+                    <div className="space-y-1">
+                      <div className="font-medium">Quiz {attempt.quizId.substring(0, 8)}</div>
+                      <div className="text-sm text-muted-foreground">{dateStr}</div>
+                    </div>
+                    <div className={`text-2xl font-bold ${score >= 80 ? "text-chart-2" : score >= 60 ? "text-chart-4" : "text-destructive"}`}>
+                      {Math.round(score)}%
+                    </div>
+                  </div>
+                );
+              })
+            )}
             <Link href="/quizzes/available">
               <Button className="w-full" data-testid="button-take-new-quiz">
                 <Brain className="h-4 w-4 mr-2" />

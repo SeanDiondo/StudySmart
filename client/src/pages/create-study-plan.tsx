@@ -8,38 +8,74 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Calendar, Clock, Target, ChevronRight, ChevronLeft } from "lucide-react";
 import { useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import type { Subject } from "@shared/schema";
 
 export default function CreateStudyPlan() {
   const [, setLocation] = useLocation();
   const [step, setStep] = useState(1);
   const totalSteps = 3;
+  const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
+
+  // Fetch available subjects from backend
+  const { data: subjects } = useQuery<Subject[]>({
+    queryKey: ["/api/subjects"],
+    enabled: isAuthenticated,
+  });
 
   // Form state
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+  const [subjectHours, setSubjectHours] = useState<Record<string, number>>({});
+  const [subjectPriorities, setSubjectPriorities] = useState<Record<string, number>>({});
   const [availableDays, setAvailableDays] = useState<string[]>([]);
-  const [timeSlots, setTimeSlots] = useState<{day: string, startTime: string, endTime: string}[]>([]);
   const [hoursPerWeek, setHoursPerWeek] = useState("");
+  const [learningPace, setLearningPace] = useState("moderate");
   const [learningGoals, setLearningGoals] = useState("");
 
-  const subjects = [
-    "Programming Fundamentals",
-    "Data Structures and Algorithms",
-    "Database Systems",
-    "Web Development",
-    "Software Engineering",
-    "Computer Networks",
-    "Operating Systems",
-    "Information Security",
-    "Mobile Application Development",
-    "System Analysis and Design",
-  ];
+  // Create study plan mutation
+  const createPlanMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/study-plans", data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/study-plans"] });
+      toast({
+        title: "Success!",
+        description: "Your study plan has been created",
+      });
+      setLocation("/dashboard");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create study plan",
+        variant: "destructive",
+      });
+    },
+  });
 
   const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-  const handleSubjectToggle = (subject: string) => {
-    setSelectedSubjects(prev =>
-      prev.includes(subject) ? prev.filter(s => s !== subject) : [...prev, subject]
-    );
+  const handleSubjectToggle = (subjectId: string) => {
+    setSelectedSubjects(prev => {
+      if (prev.includes(subjectId)) {
+        return prev.filter(s => s !== subjectId);
+      } else {
+        // Initialize with default values
+        if (!subjectHours[subjectId]) {
+          setSubjectHours(prev => ({ ...prev, [subjectId]: 3 }));
+        }
+        if (!subjectPriorities[subjectId]) {
+          setSubjectPriorities(prev => ({ ...prev, [subjectId]: 3 }));
+        }
+        return [...prev, subjectId];
+      }
+    });
   };
 
   const handleDayToggle = (day: string) => {
@@ -58,8 +94,22 @@ export default function CreateStudyPlan() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Will be connected to backend
-    setLocation("/dashboard");
+    
+    // Build subjects array with hours and priorities
+    const planSubjects = selectedSubjects.map(subjectId => ({
+      subjectId,
+      hoursAllocated: subjectHours[subjectId] || 3,
+      priority: subjectPriorities[subjectId] || 3,
+    }));
+
+    const planData = {
+      hoursPerWeek: parseInt(hoursPerWeek) || 10,
+      learningPace: learningPace as "slow" | "moderate" | "fast",
+      learningGoals: learningGoals || undefined,
+      subjects: planSubjects,
+    };
+
+    createPlanMutation.mutate(planData);
   };
 
   const progress = (step / totalSteps) * 100;
@@ -98,22 +148,23 @@ export default function CreateStudyPlan() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
-                {subjects.map((subject) => (
+                {(subjects || []).map((subject) => (
                   <div
-                    key={subject}
+                    key={subject.id}
                     className={`flex items-start space-x-3 p-4 rounded-lg border cursor-pointer hover-elevate ${
-                      selectedSubjects.includes(subject) ? "border-primary bg-primary/5" : ""
+                      selectedSubjects.includes(subject.id) ? "border-primary bg-primary/5" : ""
                     }`}
-                    onClick={() => handleSubjectToggle(subject)}
-                    data-testid={`checkbox-subject-${subject.toLowerCase().replace(/\s+/g, "-")}`}
+                    onClick={() => handleSubjectToggle(subject.id)}
+                    data-testid={`checkbox-subject-${subject.name.toLowerCase().replace(/\s+/g, "-")}`}
                   >
                     <Checkbox
-                      checked={selectedSubjects.includes(subject)}
-                      onCheckedChange={() => handleSubjectToggle(subject)}
+                      checked={selectedSubjects.includes(subject.id)}
+                      onCheckedChange={() => handleSubjectToggle(subject.id)}
                       className="mt-0.5"
                     />
                     <div>
-                      <div className="font-medium">{subject}</div>
+                      <div className="font-medium">{subject.name}</div>
+                      <div className="text-sm text-muted-foreground">{subject.code}</div>
                     </div>
                   </div>
                 ))}

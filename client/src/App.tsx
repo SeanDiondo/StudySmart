@@ -6,9 +6,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { NavHeader } from "@/components/nav-header";
 import { useAuth } from "@/hooks/useAuth";
+import { Redirect } from "wouter";
+import { ProtectedRoute } from "@/components/protected-route";
 
 // Pages
 import Landing from "@/pages/landing";
+import Login from "@/pages/login";
+import Signup from "@/pages/signup";
 import StudentDashboard from "@/pages/student-dashboard";
 import CreateStudyPlan from "@/pages/create-study-plan";
 import QuizInterface from "@/pages/quiz-interface";
@@ -22,29 +26,40 @@ import NotFound from "@/pages/not-found";
 function Router() {
   const { isAuthenticated, isLoading, user } = useAuth();
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {isAuthenticated && user && <NavHeader user={user} />}
       <main className={isAuthenticated ? "container mx-auto px-4 md:px-6 lg:px-8 py-8" : ""}>
         <Switch>
-          {isLoading || !isAuthenticated ? (
-            <Route path="/" component={Landing} />
-          ) : (
-            <>
-              {/* Authenticated routes - redirect to dashboard */}
-              <Route path="/" component={StudentDashboard} />
-              <Route path="/dashboard" component={StudentDashboard} />
-              <Route path="/study-plans/new" component={CreateStudyPlan} />
-              <Route path="/quizzes" component={AvailableQuizzes} />
-              <Route path="/quizzes/available" component={AvailableQuizzes} />
-              <Route path="/quiz/:id" component={QuizInterface} />
-              <Route path="/quiz/results/:id" component={QuizResults} />
-              <Route path="/performance" component={PerformanceDashboard} />
-              <Route path="/materials" component={MaterialsLibrary} />
-              <Route path="/admin/materials" component={AdminMaterials} />
-            </>
-          )}
-          <Route component={NotFound} />
+          {/* Public routes */}
+          <Route path="/" component={isAuthenticated ? () => <ProtectedRoute><StudentDashboard /></ProtectedRoute> : Landing} />
+          <Route path="/login" component={isAuthenticated ? () => <Redirect to="/dashboard" /> : Login} />
+          <Route path="/signup" component={isAuthenticated ? () => <Redirect to="/dashboard" /> : Signup} />
+          
+          {/* Protected routes - always present, ProtectedRoute handles redirect */}
+          <Route path="/dashboard">{() => <ProtectedRoute><StudentDashboard /></ProtectedRoute>}</Route>
+          <Route path="/study-plans/new">{() => <ProtectedRoute><CreateStudyPlan /></ProtectedRoute>}</Route>
+          <Route path="/quizzes">{() => <ProtectedRoute><AvailableQuizzes /></ProtectedRoute>}</Route>
+          <Route path="/quizzes/available">{() => <ProtectedRoute><AvailableQuizzes /></ProtectedRoute>}</Route>
+          <Route path="/quiz/:id">{() => <ProtectedRoute><QuizInterface /></ProtectedRoute>}</Route>
+          <Route path="/quiz/results/:id">{() => <ProtectedRoute><QuizResults /></ProtectedRoute>}</Route>
+          <Route path="/performance">{() => <ProtectedRoute><PerformanceDashboard /></ProtectedRoute>}</Route>
+          <Route path="/materials">{() => <ProtectedRoute><MaterialsLibrary /></ProtectedRoute>}</Route>
+          <Route path="/admin/materials">{() => <ProtectedRoute><AdminMaterials /></ProtectedRoute>}</Route>
+          
+          {/* Catch-all */}
+          <Route path="/:rest*" component={NotFound} />
         </Switch>
       </main>
     </div>
