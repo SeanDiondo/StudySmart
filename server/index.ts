@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedTestUsers } from "./seedTestUsers";
+import { seedDefaultSubjects } from "./seedDefaultSubjects";
 
 const app = express();
 
@@ -48,8 +49,9 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Seed test users on startup
+  // Seed test users and default subjects on startup
   await seedTestUsers();
+  await seedDefaultSubjects();
 
   const server = await registerRoutes(app);
 
