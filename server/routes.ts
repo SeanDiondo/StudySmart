@@ -342,10 +342,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // All validation passed - now we can safely modify the database
-      // Get existing plan reference (will delete after new plan is created)
-      const existingPlan = await storage.getStudyPlan(userId);
-
-      // Create new plan
+      
+      // Create new plan (keep all existing plans - don't delete them)
       newPlan = await storage.createStudyPlan(validatedPlanData);
 
       // Create all validated subjects
@@ -354,12 +352,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...subjectFields,
           studyPlanId: newPlan.id,
         });
-      }
-
-      // ONLY delete old plan after new plan and all subjects are successfully created
-      // CASCADE DELETE will automatically remove associated subjects
-      if (existingPlan) {
-        await storage.deleteStudyPlan(existingPlan.id);
       }
 
       res.json(newPlan);
