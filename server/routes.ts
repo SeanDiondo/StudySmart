@@ -129,6 +129,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin-only endpoint to update user details
+  app.patch("/api/admin/users/:userId", isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      
+      // Only admins can edit users
+      if (currentUser?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can edit users" });
+      }
+
+      const { userId } = req.params;
+      const { firstName, lastName, email } = req.body;
+
+      const updatedUser = await storage.updateUser(userId, {
+        firstName,
+        lastName,
+        email,
+      });
+      
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
+  // Admin-only endpoint to delete a user
+  app.delete("/api/admin/users/:userId", isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      
+      // Only admins can delete users
+      if (currentUser?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can delete users" });
+      }
+
+      const { userId } = req.params;
+
+      // Prevent deleting yourself
+      if (userId === currentUser.id) {
+        return res.status(400).json({ message: "You cannot delete your own account" });
+      }
+
+      await storage.deleteUser(userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
   // Object Storage routes for materials uploads
   app.post("/api/objects/upload", isAuthenticated, async (req: any, res) => {
     try {
