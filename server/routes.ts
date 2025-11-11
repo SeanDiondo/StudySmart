@@ -1,4 +1,5 @@
 // Reference: blueprint:javascript_log_in_with_replit
+// Reference: blueprint:javascript_object_storage
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
@@ -14,6 +15,10 @@ import {
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { z } from "zod";
+import {
+  ObjectStorageService,
+  ObjectNotFoundError,
+} from "./objectStorage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
@@ -120,6 +125,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating user role:", error);
       res.status(500).json({ message: "Failed to update user role" });
+    }
+  });
+
+  // Object Storage routes for materials uploads
+  app.post("/api/objects/upload", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can upload files" });
+      }
+      
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error("Error getting upload URL:", error);
+      res.status(500).json({ message: "Failed to get upload URL" });
+    }
+  });
+
+  app.get("/objects/:objectPath(*)", isAuthenticated, async (req, res) => {
+    const objectStorageService = new ObjectStorageService();
+    try {
+      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error accessing object:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
     }
   });
 

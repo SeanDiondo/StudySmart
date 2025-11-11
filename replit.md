@@ -17,22 +17,34 @@ Key features include:
 
 ## Recent Changes
 
-**November 11, 2025 - MVP Implementation Complete**
+**November 11, 2025 - File Upload & Admin Management Features**
 
-All core features have been implemented and integrated:
+Added comprehensive admin management tools and file upload capabilities:
 
-**✅ Completed Features:**
-- Frontend: All pages and components implemented with proper loading/error/empty states
-- Backend: Full API implementation with Replit Auth, PostgreSQL, and OpenAI GPT-5
-- Authentication: Replit Auth (OIDC) integration with role-based access control
+**✅ New Features:**
+- **File Upload System**: Admins can now upload actual files (PDF, DOC, PPT) up to 50MB using Replit Object Storage
+- **Dual Upload Options**: Tab-based interface supporting both file uploads and URL links
+- **Admin Subject Management**: Create, edit, and delete subjects (both default CCIT and custom)
+- **Admin User Management**: View all users, change roles (student/admin), search functionality
+- **Object Storage Integration**: Secure file storage with access control and presigned URLs
+
+**Previous MVP Implementation - November 11, 2025**
+
+All core features implemented:
+- Frontend: All pages and components with proper loading/error/empty states
+- Backend: Full API implementation with password-based auth, PostgreSQL, and OpenAI GPT-5
+- Authentication: Password-based login with bcrypt hashing and session management
 - Study Plans: Creation, editing, subject selection with priorities
 - AI Quizzes: Generation → Taking (with timer) → Results (with explanations)
 - Performance Dashboard: Statistics, charts (recharts), AI-generated insights
 - Study Materials: Admin upload/edit/delete, student library view
 - Database: Complete schema with proper relationships and indexes
 
-**Known Limitations:**
-- **Testing**: Replit Auth requires manual user interaction for login, preventing fully automated end-to-end tests in CI/CD environments. All features are implemented and functional, but comprehensive E2E testing requires manual verification by logging in through the Replit authentication flow.
+**Technical Implementation:**
+- Object storage uses Google Cloud Storage via Replit's sidecar endpoint
+- File uploads use presigned URLs for direct client-to-storage transfers
+- ACL policies manage file access permissions
+- Uppy library provides drag-and-drop upload UI with progress tracking
 
 **Technical Highlights:**
 - Quiz timer uses `timerInitialized` ref to prevent premature submission before data loads
