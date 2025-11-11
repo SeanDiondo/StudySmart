@@ -36,6 +36,9 @@ export default function CreateStudyPlan() {
   const [hoursPerWeek, setHoursPerWeek] = useState("");
   const [learningPace, setLearningPace] = useState("moderate");
   const [learningGoals, setLearningGoals] = useState("");
+  
+  // Weekly calendar state: { "monday-09:00": true, "tuesday-14:00": true, ... }
+  const [selectedTimeSlots, setSelectedTimeSlots] = useState<Record<string, boolean>>({});
 
   // Create study plan mutation
   const createPlanMutation = useMutation({
@@ -76,6 +79,43 @@ export default function CreateStudyPlan() {
     );
   };
 
+  // Time slots for calendar (hourly from 6 AM to 11 PM)
+  const timeSlots = [
+    "06:00", "07:00", "08:00", "09:00", "10:00", "11:00",
+    "12:00", "13:00", "14:00", "15:00", "16:00", "17:00",
+    "18:00", "19:00", "20:00", "21:00", "22:00", "23:00"
+  ];
+
+  const formatTimeDisplay = (time: string) => {
+    const hour = parseInt(time.split(":")[0]);
+    if (hour < 12) return `${hour === 0 ? 12 : hour} AM`;
+    if (hour === 12) return "12 PM";
+    return `${hour - 12} PM`;
+  };
+
+  const handleTimeSlotToggle = (day: string, time: string) => {
+    const key = `${day.toLowerCase()}-${time}`;
+    setSelectedTimeSlots(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
+
+  const calculateTotalHours = () => {
+    return Object.values(selectedTimeSlots).filter(Boolean).length;
+  };
+
+  const getSelectedDaysCount = () => {
+    const days = new Set<string>();
+    Object.keys(selectedTimeSlots).forEach(key => {
+      if (selectedTimeSlots[key]) {
+        const [day] = key.split("-");
+        days.add(day);
+      }
+    });
+    return days.size;
+  };
+
   const handleNext = () => {
     if (step < totalSteps) setStep(step + 1);
   };
@@ -94,15 +134,65 @@ export default function CreateStudyPlan() {
       priority: subjectPriorities[subjectId] || 3,
     }));
 
+    // Build time slots from selected calendar blocks - preserve non-contiguous blocks
+    const timeSlotsByDay: Record<string, string[]> = {};
+    Object.keys(selectedTimeSlots).forEach(key => {
+      if (selectedTimeSlots[key]) {
+        const [day, time] = key.split("-");
+        if (!timeSlotsByDay[day]) {
+          timeSlotsByDay[day] = [];
+        }
+        timeSlotsByDay[day].push(time);
+      }
+    });
+
+    // Group contiguous time blocks per day (don't collapse gaps)
+    const availableTimeSlots: Array<{ day: string; startTime: string; endTime: string }> = [];
+    
+    const addOneHour = (time: string): string => {
+      const hour = parseInt(time.split(':')[0]);
+      const nextHour = (hour + 1) % 24;
+      return `${String(nextHour).padStart(2, '0')}:00`;
+    };
+    
+    Object.keys(timeSlotsByDay).forEach(day => {
+      const times = timeSlotsByDay[day].sort();
+      
+      // Group into contiguous blocks
+      let currentBlockStart = times[0];
+      let previousTime = times[0];
+      
+      for (let i = 1; i <= times.length; i++) {
+        const currentTime = times[i];
+        const isContiguous = i < times.length && 
+          parseInt(currentTime.split(':')[0]) === parseInt(previousTime.split(':')[0]) + 1;
+        
+        if (!isContiguous) {
+          // End current block - endTime is one hour after the last selected block
+          availableTimeSlots.push({
+            day: day.toLowerCase(),
+            startTime: currentBlockStart,
+            endTime: addOneHour(previousTime)
+          });
+          
+          if (i < times.length) {
+            currentBlockStart = currentTime;
+          }
+        }
+        
+        previousTime = currentTime;
+      }
+    });
+
+    // Get unique days
+    const uniqueDays = Object.keys(timeSlotsByDay);
+    const totalHours = calculateTotalHours();
+
     const planData = {
-      hoursPerWeek: parseInt(hoursPerWeek) || 10,
+      hoursPerWeek: totalHours,
       learningGoals: learningGoals || "Personal development and skill improvement",
-      availableDays: availableDays.map(day => day.toLowerCase()),
-      availableTimeSlots: availableDays.map(day => ({
-        day: day.toLowerCase(),
-        startTime: "09:00",
-        endTime: "17:00"
-      })),
+      availableDays: uniqueDays,
+      availableTimeSlots: availableTimeSlots,
       subjects: planSubjects,
     };
 
@@ -190,7 +280,7 @@ export default function CreateStudyPlan() {
           </Card>
         )}
 
-        {/* Step 2: Available Time */}
+        {/* Step 2: Weekly Calendar Schedule */}
         {step === 2 && (
           <Card>
             <CardHeader>
@@ -200,60 +290,93 @@ export default function CreateStudyPlan() {
                 </div>
                 <div>
                   <CardTitle className="text-xl">Set Your Schedule</CardTitle>
-                  <CardDescription>When are you available to study?</CardDescription>
+                  <CardDescription>Click time blocks to set when you're available to study</CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-3">
-                <Label className="text-base font-semibold flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Available Days
-                </Label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {daysOfWeek.map((day) => (
-                    <div
-                      key={day}
-                      className={`flex items-center space-x-2 p-3 rounded-lg border cursor-pointer hover-elevate ${
-                        availableDays.includes(day) ? "border-primary bg-primary/5" : ""
-                      }`}
-                      onClick={() => handleDayToggle(day)}
-                      data-testid={`checkbox-day-${day.toLowerCase()}`}
-                    >
-                      <div className={`h-5 w-5 rounded border-2 flex items-center justify-center ${
-                        availableDays.includes(day) 
-                          ? "bg-primary border-primary" 
-                          : "border-input"
-                      }`}>
-                        {availableDays.includes(day) && (
-                          <Check className="h-3 w-3 text-primary-foreground" />
-                        )}
+              {/* Summary */}
+              <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-primary" />
+                  <span className="font-semibold">{calculateTotalHours()} hours selected</span>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedTimeSlots({})}
+                  data-testid="button-clear-schedule"
+                >
+                  Clear All
+                </Button>
+              </div>
+
+              {/* Weekly Calendar Grid */}
+              <div className="overflow-x-auto">
+                <div className="inline-block min-w-full">
+                  <div className="grid grid-cols-[80px_repeat(7,1fr)] gap-px bg-border rounded-lg overflow-hidden">
+                    {/* Header Row - Days of Week */}
+                    <div className="bg-muted p-2"></div>
+                    {daysOfWeek.map((day) => (
+                      <div
+                        key={day}
+                        className="bg-muted p-2 text-center font-semibold text-sm"
+                        data-testid={`header-${day.toLowerCase()}`}
+                      >
+                        <div className="hidden md:block">{day}</div>
+                        <div className="md:hidden">{day.substring(0, 3)}</div>
                       </div>
-                      <Label className="cursor-pointer font-normal">{day}</Label>
-                    </div>
-                  ))}
+                    ))}
+
+                    {/* Time Slot Rows */}
+                    {timeSlots.map((time) => (
+                      <div key={`row-${time}`} className="contents">
+                        {/* Time Label */}
+                        <div className="bg-muted p-2 flex items-center justify-end text-xs text-muted-foreground font-medium">
+                          {formatTimeDisplay(time)}
+                        </div>
+                        
+                        {/* Time Blocks for Each Day */}
+                        {daysOfWeek.map((day) => {
+                          const key = `${day.toLowerCase()}-${time}`;
+                          const isSelected = selectedTimeSlots[key];
+                          
+                          return (
+                            <div
+                              key={key}
+                              onClick={() => handleTimeSlotToggle(day, time)}
+                              className={`
+                                bg-background p-2 cursor-pointer hover-elevate active-elevate-2
+                                min-h-[40px] flex items-center justify-center
+                                ${isSelected ? "bg-primary text-primary-foreground" : ""}
+                              `}
+                              data-testid={`timeslot-${day.toLowerCase()}-${time}`}
+                            >
+                              {isSelected && (
+                                <Check className="h-4 w-4" />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <Label htmlFor="hours" className="text-base font-semibold flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  Hours Per Week
-                </Label>
-                <Input
-                  id="hours"
-                  type="number"
-                  min="1"
-                  max="40"
-                  placeholder="e.g., 15"
-                  value={hoursPerWeek}
-                  onChange={(e) => setHoursPerWeek(e.target.value)}
-                  required
-                  data-testid="input-hours-per-week"
-                />
-                <p className="text-sm text-muted-foreground">
-                  How many hours can you dedicate to studying each week?
-                </p>
+              {/* Instructions */}
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-primary" />
+                  <h4 className="font-semibold text-sm">How to use:</h4>
+                </div>
+                <ul className="text-sm text-muted-foreground space-y-1 ml-7">
+                  <li>• Click any time block to mark it as available</li>
+                  <li>• Click again to deselect</li>
+                  <li>• Each block represents 1 hour of study time</li>
+                  <li>• Select at least a few hours to continue</li>
+                </ul>
               </div>
 
               <div className="flex items-center justify-between pt-4 border-t gap-3">
@@ -269,10 +392,10 @@ export default function CreateStudyPlan() {
                 <Button
                   type="button"
                   onClick={handleNext}
-                  disabled={availableDays.length === 0 || !hoursPerWeek}
+                  disabled={calculateTotalHours() === 0}
                   data-testid="button-next-step-2"
                 >
-                  Next Step
+                  Next Step ({calculateTotalHours()}h selected)
                   <ChevronRight className="h-4 w-4 ml-2" />
                 </Button>
               </div>
@@ -318,8 +441,8 @@ export default function CreateStudyPlan() {
                 <h4 className="font-semibold">Study Plan Summary</h4>
                 <div className="space-y-1 text-sm">
                   <p><span className="text-muted-foreground">Subjects:</span> {selectedSubjects.length} selected</p>
-                  <p><span className="text-muted-foreground">Schedule:</span> {availableDays.length} days per week</p>
-                  <p><span className="text-muted-foreground">Time commitment:</span> {hoursPerWeek} hours per week</p>
+                  <p><span className="text-muted-foreground">Schedule:</span> {getSelectedDaysCount()} days per week</p>
+                  <p><span className="text-muted-foreground">Time commitment:</span> {calculateTotalHours()} hours per week</p>
                 </div>
               </div>
 
