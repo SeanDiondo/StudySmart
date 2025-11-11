@@ -149,8 +149,8 @@ export default function StudentDashboard() {
             </Link>
           </div>
           <div className="space-y-4">
-            {studyPlans.map((plan) => (
-              <StudyPlanCard key={plan.id} plan={plan} subjects={subjects} />
+            {studyPlans.map((plan, index) => (
+              <StudyPlanCard key={plan.id} plan={plan} subjects={subjects} planNumber={index + 1} />
             ))}
           </div>
         </div>
@@ -250,7 +250,7 @@ export default function StudentDashboard() {
   );
 }
 
-function StudyPlanCard({ plan, subjects }: { plan: StudyPlan; subjects?: Subject[] }) {
+function StudyPlanCard({ plan, subjects, planNumber }: { plan: StudyPlan; subjects?: Subject[]; planNumber: number }) {
   const { data: planSubjects } = useQuery<any[]>({
     queryKey: ["/api/study-plans", plan.id, "subjects"],
     enabled: !!plan.id,
@@ -261,20 +261,32 @@ function StudyPlanCard({ plan, subjects }: { plan: StudyPlan; subjects?: Subject
     return subject?.name || subjectId;
   };
 
+  const createdDate = new Date(plan.createdAt).toLocaleDateString('en-US', { 
+    month: 'short', 
+    day: 'numeric', 
+    year: 'numeric' 
+  });
+
   return (
-    <Card className="hover-elevate">
+    <Card className="hover-elevate" data-testid={`study-plan-card-${plan.id}`}>
       <CardHeader>
-        <div className="flex items-start justify-between">
-          <div className="space-y-1">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1 flex-1">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-xs font-mono">
+                Plan #{planNumber}
+              </Badge>
+              <span className="text-xs text-muted-foreground">{createdDate}</span>
+            </div>
             <CardTitle className="text-lg">
-              {plan.learningGoals ? plan.learningGoals.substring(0, 50) + (plan.learningGoals.length > 50 ? "..." : "") : "Study Plan"}
+              {plan.learningGoals ? plan.learningGoals.substring(0, 60) + (plan.learningGoals.length > 60 ? "..." : "") : "Study Plan"}
             </CardTitle>
             <CardDescription className="flex items-center gap-1 text-sm">
               <Clock className="h-3 w-3" />
               {plan.hoursPerWeek} hours per week
             </CardDescription>
           </div>
-          <Badge variant="secondary" className="text-xs">
+          <Badge variant={plan.isActive ? "default" : "secondary"} className="text-xs">
             {plan.isActive ? "Active" : "Inactive"}
           </Badge>
         </div>
