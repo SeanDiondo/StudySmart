@@ -14,16 +14,16 @@ export default function Landing() {
             <span className="text-xl font-bold font-display">CCIT Study Plan</span>
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/login">
+            <a href="/api/login">
               <Button variant="ghost" data-testid="button-login">
                 Login
               </Button>
-            </Link>
-            <Link href="/signup">
+            </a>
+            <a href="/api/login">
               <Button data-testid="button-signup">
                 Sign Up
               </Button>
-            </Link>
+            </a>
           </div>
         </div>
       </header>
@@ -41,11 +41,11 @@ export default function Landing() {
                 Personalized study plans, adaptive quizzes, and intelligent insights designed specifically for CCIT students. Transform your learning journey today.
               </p>
               <div className="flex flex-wrap gap-4">
-                <Link href="/signup">
+                <a href="/api/login">
                   <Button size="lg" className="text-base px-8" data-testid="button-get-started">
                     Get Started Free
                   </Button>
-                </Link>
+                </a>
                 <Button size="lg" variant="outline" className="text-base px-8" data-testid="button-learn-more">
                   Learn More
                 </Button>
@@ -238,11 +238,11 @@ export default function Landing() {
               Join hundreds of CCIT students who are already achieving better grades with personalized, AI-powered study plans
             </p>
             <div className="flex flex-wrap justify-center gap-4 pt-4">
-              <Link href="/signup">
+              <a href="/api/login">
                 <Button size="lg" variant="secondary" className="text-base px-8" data-testid="button-cta-signup">
                   Start Learning Today
                 </Button>
-              </Link>
+              </a>
             </div>
           </div>
         </div>
