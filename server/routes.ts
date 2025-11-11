@@ -295,6 +295,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Study Plan routes
+  app.get("/api/study-plans", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const plan = await storage.getStudyPlan(userId);
+      res.json(plan || null);
+    } catch (error) {
+      console.error("Error fetching study plan:", error);
+      res.status(500).json({ message: "Failed to fetch study plan" });
+    }
+  });
+
   app.get("/api/study-plans/my-plan", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
