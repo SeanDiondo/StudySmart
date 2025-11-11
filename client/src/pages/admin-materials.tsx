@@ -162,6 +162,16 @@ export default function AdminMaterials() {
         return;
       }
       
+      // Validate required fields before submitting
+      if (!uploadForm.title || !uploadForm.subjectId) {
+        toast({
+          title: "Missing Information",
+          description: "Please fill in the title and select a subject before uploading",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       const normalizedUrl = fileUrl.split("?")[0];
       
       uploadMutation.mutate({
