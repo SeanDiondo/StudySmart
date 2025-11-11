@@ -266,7 +266,7 @@ function StudyPlanCard({ plan, subjects }: { plan: StudyPlan; subjects?: Subject
             </CardDescription>
           </div>
           <Badge variant="secondary" className="text-xs">
-            {plan.learningPace} pace
+            {plan.isActive ? "Active" : "Inactive"}
           </Badge>
         </div>
       </CardHeader>
