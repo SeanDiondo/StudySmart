@@ -142,6 +142,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId } = req.params;
       const { firstName, lastName, email } = req.body;
 
+      // Validate input
+      if (email && !email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+        return res.status(400).json({ message: "Invalid email format" });
+      }
+      
+      if (firstName !== undefined && (!firstName || firstName.trim().length === 0)) {
+        return res.status(400).json({ message: "First name cannot be empty" });
+      }
+      
+      if (lastName !== undefined && (!lastName || lastName.trim().length === 0)) {
+        return res.status(400).json({ message: "Last name cannot be empty" });
+      }
+
       const updatedUser = await storage.updateUser(userId, {
         firstName,
         lastName,
