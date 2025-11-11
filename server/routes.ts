@@ -419,6 +419,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/study-plans/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Verify ownership
+      const plan = await storage.getStudyPlanById(req.params.id);
+      if (!plan) {
+        return res.status(404).json({ message: "Study plan not found" });
+      }
+      if (plan.userId !== userId) {
+        return res.status(403).json({ message: "Not authorized to delete this study plan" });
+      }
+
+      // Delete study plan subjects first
+      await storage.deleteStudyPlanSubjectsByPlanId(req.params.id);
+      
+      // Then delete the study plan
+      await storage.deleteStudyPlan(req.params.id);
+      
+      res.json({ message: "Study plan deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting study plan:", error);
+      res.status(500).json({ message: "Failed to delete study plan" });
+    }
+  });
+
   // Study Materials routes
   app.get("/api/materials", isAuthenticated, async (req, res) => {
     try {

@@ -142,16 +142,39 @@ export default function StudentDashboard() {
                 {activePlansCount} active {activePlansCount === 1 ? 'plan' : 'plans'} out of {totalPlansCount} total
               </p>
             </div>
-            <Link href="/study-plans/new">
-              <Button variant="ghost" data-testid="link-edit-plan">
-                Create New Plan
-              </Button>
-            </Link>
+            <div className="flex gap-2">
+              <Link href="/study-plans">
+                <Button variant="outline" data-testid="link-view-all-plans">
+                  <BookOpen className="h-4 w-4 mr-2" />
+                  View All Plans
+                </Button>
+              </Link>
+              <Link href="/study-plans/new">
+                <Button data-testid="link-create-new-plan">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create New
+                </Button>
+              </Link>
+            </div>
           </div>
           <div className="space-y-4">
-            {studyPlans.map((plan, index) => (
+            {studyPlans.slice(0, 2).map((plan, index) => (
               <StudyPlanCard key={plan.id} plan={plan} subjects={subjects} planNumber={index + 1} />
             ))}
+            {studyPlans.length > 2 && (
+              <Card className="bg-muted/50">
+                <CardContent className="py-6 text-center">
+                  <p className="text-muted-foreground mb-4">
+                    {studyPlans.length - 2} more study {studyPlans.length - 2 === 1 ? 'plan' : 'plans'}
+                  </p>
+                  <Link href="/study-plans">
+                    <Button variant="outline" size="sm" data-testid="button-view-all-plans">
+                      View All {totalPlansCount} Plans
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       )}

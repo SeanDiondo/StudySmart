@@ -15,6 +15,7 @@ import Login from "@/pages/login";
 import Signup from "@/pages/signup";
 import StudentDashboard from "@/pages/student-dashboard";
 import CreateStudyPlan from "@/pages/create-study-plan";
+import StudyPlansList from "@/pages/study-plans-list";
 import QuizInterface from "@/pages/quiz-interface";
 import QuizResults from "@/pages/quiz-results";
 import PerformanceDashboard from "@/pages/performance-dashboard";
@@ -52,7 +53,7 @@ function Router() {
           
           {/* Protected routes - always present, ProtectedRoute handles redirect */}
           <Route path="/dashboard">{() => <ProtectedRoute><StudentDashboard /></ProtectedRoute>}</Route>
-          <Route path="/study-plans">{() => <ProtectedRoute><CreateStudyPlan /></ProtectedRoute>}</Route>
+          <Route path="/study-plans">{() => <ProtectedRoute><StudyPlansList /></ProtectedRoute>}</Route>
           <Route path="/study-plans/new">{() => <ProtectedRoute><CreateStudyPlan /></ProtectedRoute>}</Route>
           <Route path="/quizzes">{() => <ProtectedRoute><AvailableQuizzes /></ProtectedRoute>}</Route>
           <Route path="/quizzes/available">{() => <ProtectedRoute><AvailableQuizzes /></ProtectedRoute>}</Route>
