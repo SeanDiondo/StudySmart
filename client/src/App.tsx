@@ -52,6 +52,7 @@ function Router() {
           
           {/* Protected routes - always present, ProtectedRoute handles redirect */}
           <Route path="/dashboard">{() => <ProtectedRoute><StudentDashboard /></ProtectedRoute>}</Route>
+          <Route path="/study-plans">{() => <ProtectedRoute><CreateStudyPlan /></ProtectedRoute>}</Route>
           <Route path="/study-plans/new">{() => <ProtectedRoute><CreateStudyPlan /></ProtectedRoute>}</Route>
           <Route path="/quizzes">{() => <ProtectedRoute><AvailableQuizzes /></ProtectedRoute>}</Route>
           <Route path="/quizzes/available">{() => <ProtectedRoute><AvailableQuizzes /></ProtectedRoute>}</Route>
