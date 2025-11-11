@@ -96,8 +96,13 @@ export default function CreateStudyPlan() {
 
     const planData = {
       hoursPerWeek: parseInt(hoursPerWeek) || 10,
-      learningPace: learningPace as "slow" | "moderate" | "fast",
-      learningGoals: learningGoals || undefined,
+      learningGoals: learningGoals || "Personal development and skill improvement",
+      availableDays: availableDays.map(day => day.toLowerCase()),
+      availableTimeSlots: availableDays.map(day => ({
+        day: day.toLowerCase(),
+        startTime: "09:00",
+        endTime: "17:00"
+      })),
       subjects: planSubjects,
     };
 

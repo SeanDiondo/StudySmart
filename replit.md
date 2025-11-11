@@ -17,7 +17,17 @@ Key features include:
 
 ## Recent Changes
 
-**November 11, 2025 - File Upload & Admin Management Features**
+**November 11, 2025 - Bug Fixes & Stabilization**
+
+Fixed critical bugs preventing study plan creation:
+
+**✅ Fixes:**
+- **Study Plan Creation**: Fixed validation errors by separating subjects array from plan data
+- **Database Schema Sync**: Removed obsolete `subject_id` column from `study_plans` table
+- **Infinite Loop Error**: Replaced Radix UI Checkbox with custom checkbox implementation to prevent React state update loops
+- **API Data Flow**: Fixed frontend-backend data mismatch for availableDays and availableTimeSlots fields
+
+**Previous Update - November 11, 2025 - File Upload & Admin Management Features**
 
 Added comprehensive admin management tools and file upload capabilities:
 

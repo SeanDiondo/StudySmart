@@ -248,14 +248,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       
+      // Extract subjects array from request body
+      const { subjects, ...planData } = req.body;
+      
       // CRITICAL: Validate ALL input upfront before ANY database operations
       // This ensures we never touch the database if validation fails
-      const validatedPlanData = insertStudyPlanSchema.parse({ ...req.body, userId });
+      const validatedPlanData = insertStudyPlanSchema.parse({ ...planData, userId });
       
       // Pre-validate all subjects to ensure no mid-creation failures
       const subjectsToCreate = [];
-      if (req.body.subjects && Array.isArray(req.body.subjects)) {
-        for (const subjectData of req.body.subjects) {
+      if (subjects && Array.isArray(subjects)) {
+        for (const subjectData of subjects) {
           // Validate structure (studyPlanId will be set after plan creation)
           const { studyPlanId: _, ...subjectFields } = subjectData;
           const validated = insertStudyPlanSubjectSchema.omit({ studyPlanId: true }).parse(subjectFields);
