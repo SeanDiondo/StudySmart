@@ -158,23 +158,9 @@ export default function StudentDashboard() {
             </div>
           </div>
           <div className="space-y-4">
-            {studyPlans.slice(0, 2).map((plan, index) => (
+            {studyPlans.map((plan, index) => (
               <StudyPlanCard key={plan.id} plan={plan} subjects={subjects} planNumber={index + 1} />
             ))}
-            {studyPlans.length > 2 && (
-              <Card className="bg-muted/50">
-                <CardContent className="py-6 text-center">
-                  <p className="text-muted-foreground mb-4">
-                    {studyPlans.length - 2} more study {studyPlans.length - 2 === 1 ? 'plan' : 'plans'}
-                  </p>
-                  <Link href="/study-plans">
-                    <Button variant="outline" size="sm" data-testid="button-view-all-plans">
-                      View All {totalPlansCount} Plans
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            )}
           </div>
         </div>
       )}
