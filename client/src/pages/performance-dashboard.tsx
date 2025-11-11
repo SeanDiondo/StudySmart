@@ -65,7 +65,7 @@ export default function PerformanceDashboard() {
     .map((attempt, index) => ({
       attempt: `Quiz ${index + 1}`,
       score: attempt.score,
-      date: format(new Date(attempt.completedAt), "MMM d"),
+      date: format(new Date(attempt.createdAt), "MMM d"),
     }));
 
   // Transform subject performance for chart

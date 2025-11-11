@@ -50,7 +50,7 @@ export default function StudentDashboard() {
 
   // Get recent quiz attempts (last 5)
   const recentQuizzes = (quizAttempts || [])
-    .sort((a, b) => new Date(b.submittedAt || b.startedAt).getTime() - new Date(a.submittedAt || a.startedAt).getTime())
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 5);
 
   // Get performance insights from performance data
