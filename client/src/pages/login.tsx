@@ -20,7 +20,7 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      await apiRequest("/api/auth/password-login", "POST", { email, password });
+      await apiRequest("POST", "/api/auth/password-login", { email, password });
       toast({
         title: "Login successful",
         description: "Welcome back!",
@@ -94,21 +94,6 @@ export default function Login() {
                 {isLoading ? "Signing in..." : "Sign In"}
               </Button>
             </form>
-
-            <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
-              </div>
-            </div>
-
-            <a href="/api/login" className="block">
-              <Button variant="outline" className="w-full" size="lg" data-testid="button-replit-auth">
-                Replit Auth
-              </Button>
-            </a>
 
             <div className="mt-4 p-3 bg-muted/50 rounded-md text-xs space-y-1">
               <p className="font-semibold text-foreground">Test Credentials:</p>
