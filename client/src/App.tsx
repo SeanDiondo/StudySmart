@@ -19,6 +19,8 @@ import QuizInterface from "@/pages/quiz-interface";
 import QuizResults from "@/pages/quiz-results";
 import PerformanceDashboard from "@/pages/performance-dashboard";
 import AdminMaterials from "@/pages/admin-materials";
+import AdminSubjects from "@/pages/admin-subjects";
+import AdminUsers from "@/pages/admin-users";
 import MaterialsLibrary from "@/pages/materials-library";
 import AvailableQuizzes from "@/pages/available-quizzes";
 import GenerateQuiz from "@/pages/generate-quiz";
@@ -59,6 +61,8 @@ function Router() {
           <Route path="/performance">{() => <ProtectedRoute><PerformanceDashboard /></ProtectedRoute>}</Route>
           <Route path="/materials">{() => <ProtectedRoute><MaterialsLibrary /></ProtectedRoute>}</Route>
           <Route path="/admin/materials">{() => <ProtectedRoute><AdminMaterials /></ProtectedRoute>}</Route>
+          <Route path="/admin/subjects">{() => <ProtectedRoute><AdminSubjects /></ProtectedRoute>}</Route>
+          <Route path="/admin/users">{() => <ProtectedRoute><AdminUsers /></ProtectedRoute>}</Route>
           
           {/* Catch-all */}
           <Route path="/:rest*" component={NotFound} />

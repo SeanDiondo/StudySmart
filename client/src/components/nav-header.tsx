@@ -62,6 +62,7 @@ export function NavHeader({ user }: NavHeaderProps) {
       ]
     : [
         { href: "/admin/materials", label: "Materials" },
+        { href: "/admin/subjects", label: "Subjects" },
         { href: "/admin/users", label: "Users" },
       ];
 

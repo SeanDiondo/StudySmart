@@ -80,6 +80,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin-only endpoint to get all users
+  app.get("/api/admin/users", isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      
+      // Only admins can view all users
+      if (currentUser?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can view all users" });
+      }
+
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
   // Admin-only endpoint to update any user's role
   app.patch("/api/admin/users/:userId/role", isAuthenticated, async (req: any, res) => {
     try {
