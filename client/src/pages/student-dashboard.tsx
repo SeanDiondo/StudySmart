@@ -8,12 +8,12 @@ import { LoadingSkeleton } from "@/components/loading-spinner";
 import { EmptyState } from "@/components/empty-state";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
-import type { StudyPlan, QuizAttempt, PerformanceData } from "@shared/schema";
+import type { StudyPlan, QuizAttempt, PerformanceData, Subject, Quiz } from "@shared/schema";
 
 export default function StudentDashboard() {
   const { isAuthenticated } = useAuth();
 
-  const { data: studyPlan, isLoading: planLoading } = useQuery<StudyPlan>({
+  const { data: studyPlans, isLoading: planLoading } = useQuery<StudyPlan[]>({
     queryKey: ["/api/study-plans"],
     enabled: isAuthenticated,
   });
@@ -28,13 +28,18 @@ export default function StudentDashboard() {
     enabled: isAuthenticated,
   });
 
-  const { data: studyPlanSubjects } = useQuery<any[]>({
-    queryKey: ["/api/study-plans", studyPlan?.id, "subjects"],
-    enabled: isAuthenticated && !!studyPlan?.id,
+  const { data: subjects } = useQuery<Subject[]>({
+    queryKey: ["/api/subjects"],
+    enabled: isAuthenticated,
+  });
+
+  const { data: quizzes } = useQuery<Quiz[]>({
+    queryKey: ["/api/quizzes"],
+    enabled: isAuthenticated,
   });
 
   const isLoading = planLoading;
-  const hasStudyPlan = !!studyPlan;
+  const hasStudyPlan = studyPlans && studyPlans.length > 0;
 
   // Calculate stats from real data
   const quizzesCompleted = quizAttempts?.length || 0;
@@ -56,12 +61,10 @@ export default function StudentDashboard() {
   // Get performance insights from performance data
   const performanceInsights = {
     strengths: (performance || [])
-      .filter(p => p.category === 'strength')
-      .map(p => p.area)
+      .flatMap(p => p.strengths || [])
       .slice(0, 5),
     weaknesses: (performance || [])
-      .filter(p => p.category === 'weakness')
-      .map(p => p.area)
+      .flatMap(p => p.weaknesses || [])
       .slice(0, 5),
   };
 
@@ -123,53 +126,24 @@ export default function StudentDashboard() {
         ))}
       </div>
 
-      {/* Your Study Plan */}
-      {studyPlan && (
+      {/* Your Study Plans */}
+      {studyPlans && studyPlans.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold font-display">Your Study Plan</h2>
+            <h2 className="text-2xl font-semibold font-display">
+              Your Study Plans ({studyPlans.length})
+            </h2>
             <Link href="/study-plans/new">
               <Button variant="ghost" data-testid="link-edit-plan">
-                Edit Plan
+                Create New Plan
               </Button>
             </Link>
           </div>
-          <Card className="hover-elevate">
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <CardTitle className="text-lg">Weekly Study Schedule</CardTitle>
-                  <CardDescription className="flex items-center gap-1 text-sm">
-                    <Clock className="h-3 w-3" />
-                    {studyPlan.hoursPerWeek} hours per week
-                  </CardDescription>
-                </div>
-                <Badge variant="secondary" className="text-xs">
-                  {studyPlan.learningPace} pace
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {studyPlanSubjects && studyPlanSubjects.length > 0 ? (
-                <div className="space-y-2">
-                  <h4 className="font-medium text-sm text-muted-foreground">Subjects</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {studyPlanSubjects.map((subject: any) => (
-                      <Badge key={subject.id} variant="outline" className="text-xs">
-                        {subject.subjectName || subject.subjectId}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-              {studyPlan.learningGoals && (
-                <div className="space-y-2">
-                  <h4 className="font-medium text-sm text-muted-foreground">Learning Goals</h4>
-                  <p className="text-sm">{studyPlan.learningGoals}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <div className="space-y-4">
+            {studyPlans.map((plan) => (
+              <StudyPlanCard key={plan.id} plan={plan} subjects={subjects} />
+            ))}
+          </div>
         </div>
       )}
 
@@ -196,14 +170,14 @@ export default function StudentDashboard() {
             ) : (
               recentQuizzes.map((attempt) => {
                 const score = attempt.score || 0;
-                const dateStr = attempt.submittedAt 
-                  ? new Date(attempt.submittedAt).toLocaleDateString()
-                  : new Date(attempt.startedAt).toLocaleDateString();
+                const dateStr = new Date(attempt.createdAt).toLocaleDateString();
+                const quiz = quizzes?.find(q => q.id === attempt.quizId);
+                const quizTitle = quiz?.title || `Quiz #${attempt.quizId.substring(0, 8)}`;
                 
                 return (
                   <div key={attempt.id} className="flex items-center justify-between p-4 rounded-lg border hover-elevate">
                     <div className="space-y-1">
-                      <div className="font-medium">Quiz {attempt.quizId.substring(0, 8)}</div>
+                      <div className="font-medium">{quizTitle}</div>
                       <div className="text-sm text-muted-foreground">{dateStr}</div>
                     </div>
                     <div className={`text-2xl font-bold ${score >= 80 ? "text-chart-2" : score >= 60 ? "text-chart-4" : "text-destructive"}`}>
@@ -264,5 +238,73 @@ export default function StudentDashboard() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function StudyPlanCard({ plan, subjects }: { plan: StudyPlan; subjects?: Subject[] }) {
+  const { data: planSubjects } = useQuery<any[]>({
+    queryKey: ["/api/study-plans", plan.id, "subjects"],
+    enabled: !!plan.id,
+  });
+
+  const getSubjectName = (subjectId: string) => {
+    const subject = subjects?.find(s => s.id === subjectId);
+    return subject?.name || subjectId;
+  };
+
+  return (
+    <Card className="hover-elevate">
+      <CardHeader>
+        <div className="flex items-start justify-between">
+          <div className="space-y-1">
+            <CardTitle className="text-lg">
+              {plan.learningGoals ? plan.learningGoals.substring(0, 50) + (plan.learningGoals.length > 50 ? "..." : "") : "Study Plan"}
+            </CardTitle>
+            <CardDescription className="flex items-center gap-1 text-sm">
+              <Clock className="h-3 w-3" />
+              {plan.hoursPerWeek} hours per week
+            </CardDescription>
+          </div>
+          <Badge variant="secondary" className="text-xs">
+            {plan.learningPace} pace
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {planSubjects && planSubjects.length > 0 ? (
+          <div className="space-y-2">
+            <h4 className="font-medium text-sm text-muted-foreground">Subjects</h4>
+            <div className="flex flex-wrap gap-2">
+              {planSubjects.map((planSubject: any) => (
+                <Badge key={planSubject.id} variant="outline" className="text-xs">
+                  {getSubjectName(planSubject.subjectId)}
+                  {planSubject.priority && ` (Priority: ${planSubject.priority})`}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {plan.learningGoals && (
+          <div className="space-y-2">
+            <h4 className="font-medium text-sm text-muted-foreground">Learning Goals</h4>
+            <p className="text-sm">{plan.learningGoals}</p>
+          </div>
+        )}
+        <div className="flex gap-2 pt-2">
+          <Link href={`/quizzes/available`}>
+            <Button size="sm" data-testid={`button-quiz-${plan.id}`}>
+              <Brain className="h-4 w-4 mr-1" />
+              Take Quiz
+            </Button>
+          </Link>
+          <Link href={`/materials`}>
+            <Button variant="outline" size="sm" data-testid={`button-materials-${plan.id}`}>
+              <BookOpen className="h-4 w-4 mr-1" />
+              View Materials
+            </Button>
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

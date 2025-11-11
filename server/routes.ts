@@ -298,11 +298,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/study-plans", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const plan = await storage.getStudyPlan(userId);
-      res.json(plan || null);
+      const plans = await storage.getAllStudyPlans(userId);
+      res.json(plans);
     } catch (error) {
-      console.error("Error fetching study plan:", error);
-      res.status(500).json({ message: "Failed to fetch study plan" });
+      console.error("Error fetching study plans:", error);
+      res.status(500).json({ message: "Failed to fetch study plans" });
     }
   });
 
