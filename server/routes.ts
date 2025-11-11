@@ -12,6 +12,7 @@ import {
   insertStudyMaterialSchema,
   insertQuizSchema,
   insertQuizAttemptSchema,
+  type StudyPlan,
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { z } from "zod";
@@ -54,7 +55,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expires_at: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 days
       };
 
-      req.login(sessionUser, (err) => {
+      req.login(sessionUser, (err: any) => {
         if (err) {
           console.error("Login error:", err);
           return res.status(500).json({ message: "Failed to create session" });
@@ -352,6 +353,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Alias for study materials (used by frontend)
+  app.get("/api/study-materials", isAuthenticated, async (req, res) => {
+    try {
+      const { subjectId } = req.query;
+      const materials = await storage.getStudyMaterials(subjectId as string);
+      res.json(materials);
+    } catch (error) {
+      console.error("Error fetching study materials:", error);
+      res.status(500).json({ message: "Failed to fetch study materials" });
+    }
+  });
+
   app.get("/api/materials/:id", isAuthenticated, async (req, res) => {
     try {
       const material = await storage.getStudyMaterial(req.params.id);
@@ -372,8 +385,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Only admins can upload materials" });
       }
 
+      // Add uploadedBy field from authenticated user
+      const dataWithUser = {
+        ...req.body,
+        uploadedBy: user.id,
+      };
+
       // Validate and sanitize input
-      const validatedData = insertStudyMaterialSchema.parse(req.body);
+      const validatedData = insertStudyMaterialSchema.parse(dataWithUser);
+      
+      // Basic URL validation to prevent injection
+      if (validatedData.fileUrl && !validatedData.fileUrl.match(/^https?:\/\//)) {
+        return res.status(400).json({ message: "Invalid file URL format" });
+      }
+
+      const material = await storage.createStudyMaterial(validatedData);
+      res.json(material);
+    } catch (error: any) {
+      console.error("Error creating material:", error);
+      res.status(400).json({ message: error.message || "Failed to create material" });
+    }
+  });
+
+  // Alias for study materials post (used by frontend)
+  app.post("/api/study-materials", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can upload materials" });
+      }
+
+      // Add uploadedBy field from authenticated user
+      const dataWithUser = {
+        ...req.body,
+        uploadedBy: user.id,
+      };
+
+      // Validate and sanitize input
+      const validatedData = insertStudyMaterialSchema.parse(dataWithUser);
       
       // Basic URL validation to prevent injection
       if (validatedData.fileUrl && !validatedData.fileUrl.match(/^https?:\/\//)) {
@@ -412,6 +461,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.delete("/api/materials/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can delete materials" });
+      }
+
+      await storage.deleteStudyMaterial(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting material:", error);
+      res.status(500).json({ message: "Failed to delete material" });
+    }
+  });
+
+  // Alias for delete study materials (used by frontend)
+  app.delete("/api/study-materials/:id", isAuthenticated, async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.claims.sub);
       if (user?.role !== "admin") {

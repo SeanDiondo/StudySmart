@@ -43,7 +43,15 @@ export default function AdminMaterials() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [uploadTab, setUploadTab] = useState<"file" | "url">("file");
-  const [uploadForm, setUploadForm] = useState({
+  const [uploadForm, setUploadForm] = useState<{
+    title: string;
+    description: string;
+    subjectId: string;
+    url: string;
+    fileUrl?: string;
+    fileName?: string;
+    fileSize?: number;
+  }>({
     title: "",
     description: "",
     subjectId: "",
@@ -119,7 +127,16 @@ export default function AdminMaterials() {
       });
       return;
     }
-    uploadMutation.mutate(uploadForm);
+    
+    // For URL tab, convert url field to fileUrl with placeholder file info
+    const dataToSubmit = uploadTab === "url" ? {
+      ...uploadForm,
+      fileUrl: uploadForm.url,
+      fileName: "external-link",
+      fileSize: 0,
+    } : uploadForm;
+    
+    uploadMutation.mutate(dataToSubmit);
   };
 
   const handleGetUploadParameters = async () => {
@@ -135,11 +152,23 @@ export default function AdminMaterials() {
     if (result.successful && result.successful.length > 0) {
       const uploadedFile = result.successful[0];
       const fileUrl = uploadedFile.uploadURL;
+      
+      if (!fileUrl) {
+        toast({
+          title: "Error",
+          description: "File upload failed - no URL returned",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       const normalizedUrl = fileUrl.split("?")[0];
       
       uploadMutation.mutate({
         ...uploadForm,
-        url: normalizedUrl,
+        fileUrl: normalizedUrl,
+        fileName: uploadedFile.name || "unknown",
+        fileSize: uploadedFile.size || 0,
       });
     }
   };
@@ -373,7 +402,7 @@ export default function AdminMaterials() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {material.url}
+                      {material.fileUrl}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {material.description || 'No description'}
