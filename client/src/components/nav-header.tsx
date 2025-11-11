@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Brain, User, LogOut } from "lucide-react";
+import { Brain, User as UserIcon, LogOut } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,34 +10,46 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ThemeToggle } from "./theme-toggle";
+import type { User } from "@shared/schema";
 
 interface NavHeaderProps {
-  user?: {
-    name: string;
-    email: string;
-    role: "student" | "admin";
-  };
+  user?: User;
 }
 
 export function NavHeader({ user }: NavHeaderProps) {
   const [location] = useLocation();
 
   const handleLogout = () => {
-    // Will be connected to backend
-    window.location.href = "/";
+    window.location.href = "/api/logout";
   };
 
   if (!user) {
     return null;
   }
 
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
+  const getInitials = () => {
+    const firstName = user.firstName || "";
+    const lastName = user.lastName || "";
+    if (firstName && lastName) {
+      return (firstName[0] + lastName[0]).toUpperCase();
+    }
+    if (firstName) {
+      return firstName.slice(0, 2).toUpperCase();
+    }
+    if (user.email) {
+      return user.email.slice(0, 2).toUpperCase();
+    }
+    return "U";
+  };
+
+  const getUserDisplayName = () => {
+    if (user.firstName && user.lastName) {
+      return `${user.firstName} ${user.lastName}`;
+    }
+    if (user.firstName) {
+      return user.firstName;
+    }
+    return user.email || "User";
   };
 
   const navLinks = user.role === "student"
@@ -95,7 +107,7 @@ export function NavHeader({ user }: NavHeaderProps) {
                 >
                   <Avatar className="h-10 w-10">
                     <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
-                      {getInitials(user.name)}
+                      {getInitials()}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -104,11 +116,11 @@ export function NavHeader({ user }: NavHeaderProps) {
                 <div className="flex items-center gap-2 p-2">
                   <Avatar className="h-10 w-10">
                     <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
-                      {getInitials(user.name)}
+                      {getInitials()}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium">{user.name}</p>
+                    <p className="text-sm font-medium">{getUserDisplayName()}</p>
                     <p className="text-xs text-muted-foreground">{user.email}</p>
                   </div>
                 </div>
@@ -116,7 +128,7 @@ export function NavHeader({ user }: NavHeaderProps) {
                 <DropdownMenuItem asChild>
                   <Link href="/profile">
                     <div className="flex items-center cursor-pointer w-full" data-testid="link-profile">
-                      <User className="h-4 w-4 mr-2" />
+                      <UserIcon className="h-4 w-4 mr-2" />
                       Profile
                     </div>
                   </Link>

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, json, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, json, pgEnum, index, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -8,22 +8,37 @@ export const userRoleEnum = pgEnum("user_role", ["student", "admin"]);
 export const difficultyEnum = pgEnum("difficulty", ["easy", "medium", "hard"]);
 export const dayOfWeekEnum = pgEnum("day_of_week", ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]);
 
-// Users table
+// Session storage table (required for Replit Auth)
+export const sessions = pgTable(
+  "sessions",
+  {
+    sid: varchar("sid").primaryKey(),
+    sess: jsonb("sess").notNull(),
+    expire: timestamp("expire").notNull(),
+  },
+  (table) => [index("IDX_session_expire").on(table.expire)],
+);
+
+// Users table (integrated with Replit Auth)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: text("email").notNull().unique(),
-  name: text("name").notNull(),
+  email: varchar("email").unique(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  profileImageUrl: varchar("profile_image_url"),
   role: userRoleEnum("role").notNull().default("student"),
-  profilePicture: text("profile_picture"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 
 // Subjects table (both default CCIT subjects and custom subjects for irregular students)
@@ -48,7 +63,6 @@ export type Subject = typeof subjects.$inferSelect;
 export const studyPlans = pgTable("study_plans", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
-  subjectId: varchar("subject_id").notNull().references(() => subjects.id),
   learningGoals: text("learning_goals").notNull(),
   availableDays: json("available_days").$type<string[]>().notNull(), // Array of days: ["monday", "tuesday"]
   availableTimeSlots: json("available_time_slots").$type<{day: string, startTime: string, endTime: string}[]>().notNull(),
@@ -67,6 +81,24 @@ export const insertStudyPlanSchema = createInsertSchema(studyPlans).omit({
 
 export type InsertStudyPlan = z.infer<typeof insertStudyPlanSchema>;
 export type StudyPlan = typeof studyPlans.$inferSelect;
+
+// Study Plan Subjects junction table (many-to-many relationship)
+export const studyPlanSubjects = pgTable("study_plan_subjects", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  studyPlanId: varchar("study_plan_id").notNull().references(() => studyPlans.id, { onDelete: "cascade" }),
+  subjectId: varchar("subject_id").notNull().references(() => subjects.id),
+  hoursAllocated: integer("hours_allocated").notNull(), // Weekly hours for this subject
+  priority: integer("priority").notNull().default(1), // 1 (highest) to 5 (lowest)
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertStudyPlanSubjectSchema = createInsertSchema(studyPlanSubjects).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertStudyPlanSubject = z.infer<typeof insertStudyPlanSubjectSchema>;
+export type StudyPlanSubject = typeof studyPlanSubjects.$inferSelect;
 
 // Study Materials table (admin-uploaded PDFs and resources)
 export const studyMaterials = pgTable("study_materials", {
@@ -92,12 +124,11 @@ export type StudyMaterial = typeof studyMaterials.$inferSelect;
 // Quizzes table (AI-generated quizzes)
 export const quizzes = pgTable("quizzes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
   subjectId: varchar("subject_id").notNull().references(() => subjects.id),
   title: text("title").notNull(),
-  description: text("description"),
   difficulty: difficultyEnum("difficulty").notNull().default("medium"),
-  totalQuestions: integer("total_questions").notNull(),
-  estimatedMinutes: integer("estimated_minutes").notNull(),
+  questions: json("questions").$type<{questionText: string, options: string[], correctAnswer: string, explanation: string}[]>().notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -137,12 +168,13 @@ export const quizAttempts = pgTable("quiz_attempts", {
   totalQuestions: integer("total_questions").notNull(),
   correctAnswers: integer("correct_answers").notNull(),
   timeSpentMinutes: integer("time_spent_minutes").notNull(),
-  completedAt: timestamp("completed_at").notNull().defaultNow(),
+  answers: json("answers").$type<{questionIndex: number, userAnswer: string, isCorrect: boolean}[]>().notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const insertQuizAttemptSchema = createInsertSchema(quizAttempts).omit({
   id: true,
-  completedAt: true,
+  createdAt: true,
 });
 
 export type InsertQuizAttempt = z.infer<typeof insertQuizAttemptSchema>;

@@ -1,15 +1,486 @@
+// Reference: blueprint:javascript_log_in_with_replit
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { setupAuth, isAuthenticated } from "./replitAuth";
+import { generateQuiz, analyzePerformance } from "./openai";
+import {
+  insertSubjectSchema,
+  insertStudyPlanSchema,
+  insertStudyPlanSubjectSchema,
+  insertStudyMaterialSchema,
+  insertQuizSchema,
+  insertQuizAttemptSchema,
+} from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // put application routes here
-  // prefix all routes with /api
+  await setupAuth(app);
 
-  // use storage to perform CRUD operations on the storage interface
-  // e.g. storage.insertUser(user) or storage.getUserByUsername(username)
+  // Auth routes
+  app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Admin-only endpoint to update any user's role
+  app.patch("/api/admin/users/:userId/role", isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      
+      // Only admins can change user roles
+      if (currentUser?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can update user roles" });
+      }
+
+      const { userId } = req.params;
+      const { role } = req.body;
+      
+      if (!role || !["student", "admin"].includes(role)) {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+
+      const user = await storage.updateUserRole(userId, role);
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      res.status(500).json({ message: "Failed to update user role" });
+    }
+  });
+
+  // Subject routes
+  app.get("/api/subjects", isAuthenticated, async (req, res) => {
+    try {
+      const subjects = await storage.getSubjects();
+      res.json(subjects);
+    } catch (error) {
+      console.error("Error fetching subjects:", error);
+      res.status(500).json({ message: "Failed to fetch subjects" });
+    }
+  });
+
+  app.get("/api/subjects/:id", isAuthenticated, async (req, res) => {
+    try {
+      const subject = await storage.getSubject(req.params.id);
+      if (!subject) {
+        return res.status(404).json({ message: "Subject not found" });
+      }
+      res.json(subject);
+    } catch (error) {
+      console.error("Error fetching subject:", error);
+      res.status(500).json({ message: "Failed to fetch subject" });
+    }
+  });
+
+  app.post("/api/subjects", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can create subjects" });
+      }
+
+      const validatedData = insertSubjectSchema.parse(req.body);
+      const subject = await storage.createSubject(validatedData);
+      res.json(subject);
+    } catch (error: any) {
+      console.error("Error creating subject:", error);
+      res.status(400).json({ message: error.message || "Failed to create subject" });
+    }
+  });
+
+  app.patch("/api/subjects/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can update subjects" });
+      }
+
+      const subject = await storage.updateSubject(req.params.id, req.body);
+      res.json(subject);
+    } catch (error) {
+      console.error("Error updating subject:", error);
+      res.status(500).json({ message: "Failed to update subject" });
+    }
+  });
+
+  app.delete("/api/subjects/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can delete subjects" });
+      }
+
+      await storage.deleteSubject(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting subject:", error);
+      res.status(500).json({ message: "Failed to delete subject" });
+    }
+  });
+
+  // Study Plan routes
+  app.get("/api/study-plans/my-plan", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const plan = await storage.getStudyPlan(userId);
+      res.json(plan || null);
+    } catch (error) {
+      console.error("Error fetching study plan:", error);
+      res.status(500).json({ message: "Failed to fetch study plan" });
+    }
+  });
+
+  app.post("/api/study-plans", isAuthenticated, async (req: any, res) => {
+    let newPlan: StudyPlan | null = null;
+
+    try {
+      const userId = req.user.claims.sub;
+      
+      // CRITICAL: Validate ALL input upfront before ANY database operations
+      // This ensures we never touch the database if validation fails
+      const validatedPlanData = insertStudyPlanSchema.parse({ ...req.body, userId });
+      
+      // Pre-validate all subjects to ensure no mid-creation failures
+      const subjectsToCreate = [];
+      if (req.body.subjects && Array.isArray(req.body.subjects)) {
+        for (const subjectData of req.body.subjects) {
+          // Validate structure (studyPlanId will be set after plan creation)
+          const { studyPlanId: _, ...subjectFields } = subjectData;
+          const validated = insertStudyPlanSubjectSchema.omit({ studyPlanId: true }).parse(subjectFields);
+          subjectsToCreate.push(validated);
+        }
+      }
+
+      // All validation passed - now we can safely modify the database
+      // Get existing plan reference (will delete after new plan is created)
+      const existingPlan = await storage.getStudyPlan(userId);
+
+      // Create new plan
+      newPlan = await storage.createStudyPlan(validatedPlanData);
+
+      // Create all validated subjects
+      for (const subjectFields of subjectsToCreate) {
+        await storage.createStudyPlanSubject({
+          ...subjectFields,
+          studyPlanId: newPlan.id,
+        });
+      }
+
+      // ONLY delete old plan after new plan and all subjects are successfully created
+      // CASCADE DELETE will automatically remove associated subjects
+      if (existingPlan) {
+        await storage.deleteStudyPlan(existingPlan.id);
+      }
+
+      res.json(newPlan);
+    } catch (error: any) {
+      console.error("Error creating study plan:", error);
+      
+      // Cleanup: If we created a new plan, delete it (CASCADE will handle subjects)
+      if (newPlan) {
+        try {
+          await storage.deleteStudyPlan(newPlan.id);
+        } catch (cleanupError) {
+          console.error("Error cleaning up partial plan:", cleanupError);
+        }
+      }
+      
+      res.status(400).json({ message: error.message || "Failed to create study plan" });
+    }
+  });
+
+  app.get("/api/study-plans/:id/subjects", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Verify ownership: get the study plan and check if it belongs to the current user
+      const planSubjects = await storage.getStudyPlanSubjects(req.params.id);
+      if (planSubjects.length > 0) {
+        const plan = await storage.getStudyPlanById(req.params.id);
+        if (!plan || plan.userId !== userId) {
+          return res.status(403).json({ message: "Not authorized to access this study plan" });
+        }
+      }
+      
+      res.json(planSubjects);
+    } catch (error) {
+      console.error("Error fetching study plan subjects:", error);
+      res.status(500).json({ message: "Failed to fetch study plan subjects" });
+    }
+  });
+
+  app.patch("/api/study-plans/:id/subjects/:subjectId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Verify ownership
+      const plan = await storage.getStudyPlanById(req.params.id);
+      if (!plan || plan.userId !== userId) {
+        return res.status(403).json({ message: "Not authorized to update this study plan" });
+      }
+
+      // Validate with Zod schema
+      const validatedData = insertStudyPlanSubjectSchema.partial().parse(req.body);
+      const planSubject = await storage.updateStudyPlanSubject(req.params.subjectId, validatedData);
+      res.json(planSubject);
+    } catch (error: any) {
+      console.error("Error updating study plan subject:", error);
+      res.status(400).json({ message: error.message || "Failed to update study plan subject" });
+    }
+  });
+
+  // Study Materials routes
+  app.get("/api/materials", isAuthenticated, async (req, res) => {
+    try {
+      const { subjectId } = req.query;
+      const materials = await storage.getStudyMaterials(subjectId as string);
+      res.json(materials);
+    } catch (error) {
+      console.error("Error fetching study materials:", error);
+      res.status(500).json({ message: "Failed to fetch study materials" });
+    }
+  });
+
+  app.get("/api/materials/:id", isAuthenticated, async (req, res) => {
+    try {
+      const material = await storage.getStudyMaterial(req.params.id);
+      if (!material) {
+        return res.status(404).json({ message: "Material not found" });
+      }
+      res.json(material);
+    } catch (error) {
+      console.error("Error fetching material:", error);
+      res.status(500).json({ message: "Failed to fetch material" });
+    }
+  });
+
+  app.post("/api/materials", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can upload materials" });
+      }
+
+      // Validate and sanitize input
+      const validatedData = insertStudyMaterialSchema.parse(req.body);
+      
+      // Basic URL validation to prevent injection
+      if (validatedData.fileUrl && !validatedData.fileUrl.match(/^https?:\/\//)) {
+        return res.status(400).json({ message: "Invalid file URL format" });
+      }
+
+      const material = await storage.createStudyMaterial(validatedData);
+      res.json(material);
+    } catch (error: any) {
+      console.error("Error creating material:", error);
+      res.status(400).json({ message: error.message || "Failed to create material" });
+    }
+  });
+
+  app.patch("/api/materials/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can update materials" });
+      }
+
+      // Validate and sanitize input
+      const validatedData = insertStudyMaterialSchema.partial().parse(req.body);
+      
+      // Basic URL validation if fileUrl is being updated
+      if (validatedData.fileUrl && !validatedData.fileUrl.match(/^https?:\/\//)) {
+        return res.status(400).json({ message: "Invalid file URL format" });
+      }
+
+      const material = await storage.updateStudyMaterial(req.params.id, validatedData);
+      res.json(material);
+    } catch (error: any) {
+      console.error("Error updating material:", error);
+      res.status(400).json({ message: error.message || "Failed to update material" });
+    }
+  });
+
+  app.delete("/api/materials/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can delete materials" });
+      }
+
+      await storage.deleteStudyMaterial(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting material:", error);
+      res.status(500).json({ message: "Failed to delete material" });
+    }
+  });
+
+  // Quiz routes
+  app.post("/api/quizzes/generate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { subjectId, difficulty, questionCount } = req.body;
+
+      if (!subjectId || !difficulty || !questionCount) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const subject = await storage.getSubject(subjectId);
+      if (!subject) {
+        return res.status(404).json({ message: "Subject not found" });
+      }
+
+      const materials = await storage.getStudyMaterials(subjectId);
+      const materialContext = materials.map(m => `${m.title}: ${m.description}`).join("\n");
+
+      const quizData = await generateQuiz(subject.name, difficulty, questionCount, materialContext);
+
+      const quiz = await storage.createQuiz({
+        userId,
+        subjectId,
+        title: quizData.title || `${subject.name} Quiz - ${difficulty}`,
+        difficulty: difficulty as "easy" | "medium" | "hard",
+        questions: quizData.questions,
+      });
+
+      res.json(quiz);
+    } catch (error) {
+      console.error("Error generating quiz:", error);
+      res.status(500).json({ message: "Failed to generate quiz" });
+    }
+  });
+
+  app.get("/api/quizzes", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { subjectId } = req.query;
+      // Always filter by userId to prevent data exposure
+      const quizzes = await storage.getQuizzes(userId, subjectId as string);
+      res.json(quizzes);
+    } catch (error) {
+      console.error("Error fetching quizzes:", error);
+      res.status(500).json({ message: "Failed to fetch quizzes" });
+    }
+  });
+
+  app.get("/api/quizzes/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const quiz = await storage.getQuiz(req.params.id);
+      if (!quiz) {
+        return res.status(404).json({ message: "Quiz not found" });
+      }
+      // Verify ownership
+      if (quiz.userId !== userId) {
+        return res.status(403).json({ message: "Not authorized to access this quiz" });
+      }
+      res.json(quiz);
+    } catch (error) {
+      console.error("Error fetching quiz:", error);
+      res.status(500).json({ message: "Failed to fetch quiz" });
+    }
+  });
+
+  app.delete("/api/quizzes/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const quiz = await storage.getQuiz(req.params.id);
+      
+      if (!quiz) {
+        return res.status(404).json({ message: "Quiz not found" });
+      }
+      
+      if (quiz.userId !== userId) {
+        return res.status(403).json({ message: "Not authorized to delete this quiz" });
+      }
+
+      await storage.deleteQuiz(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting quiz:", error);
+      res.status(500).json({ message: "Failed to delete quiz" });
+    }
+  });
+
+  // Quiz Attempt routes
+  app.post("/api/quiz-attempts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const validatedData = insertQuizAttemptSchema.parse({ ...req.body, userId });
+      const attempt = await storage.createQuizAttempt(validatedData);
+      res.json(attempt);
+    } catch (error: any) {
+      console.error("Error creating quiz attempt:", error);
+      res.status(400).json({ message: error.message || "Failed to create quiz attempt" });
+    }
+  });
+
+  app.get("/api/quiz-attempts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { quizId } = req.query;
+      const attempts = await storage.getQuizAttempts(userId, quizId as string);
+      res.json(attempts);
+    } catch (error) {
+      console.error("Error fetching quiz attempts:", error);
+      res.status(500).json({ message: "Failed to fetch quiz attempts" });
+    }
+  });
+
+  app.get("/api/quiz-attempts/:id", isAuthenticated, async (req, res) => {
+    try {
+      const attempt = await storage.getQuizAttempt(req.params.id);
+      if (!attempt) {
+        return res.status(404).json({ message: "Quiz attempt not found" });
+      }
+      res.json(attempt);
+    } catch (error) {
+      console.error("Error fetching quiz attempt:", error);
+      res.status(500).json({ message: "Failed to fetch quiz attempt" });
+    }
+  });
+
+  // Performance analytics routes
+  app.get("/api/analytics/performance", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const stats = await storage.getUserPerformanceStats(userId);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching performance stats:", error);
+      res.status(500).json({ message: "Failed to fetch performance stats" });
+    }
+  });
+
+  app.post("/api/analytics/insights", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const stats = await storage.getUserPerformanceStats(userId);
+      
+      const insights = await analyzePerformance(
+        stats.map((s: any) => ({
+          subject: s.subjectName,
+          score: s.averageScore,
+          correctAnswers: s.correctAnswers,
+          totalQuestions: s.totalQuestions,
+        }))
+      );
+      
+      res.json(insights);
+    } catch (error) {
+      console.error("Error generating insights:", error);
+      res.status(500).json({ message: "Failed to generate insights" });
+    }
+  });
 
   const httpServer = createServer(app);
-
   return httpServer;
 }
