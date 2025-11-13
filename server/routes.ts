@@ -193,6 +193,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin-only endpoint to update student status (year level and regular/irregular)
+  app.patch("/api/admin/users/:userId/student-status", isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      
+      // Only admins can update student status
+      if (currentUser?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can update student status" });
+      }
+
+      const { userId } = req.params;
+      const { yearLevel, isRegular } = req.body;
+      
+      // Verify user exists
+      const targetUser = await storage.getUser(userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      if (!yearLevel || !["1", "2", "3", "4"].includes(yearLevel)) {
+        return res.status(400).json({ message: "Invalid year level. Must be 1, 2, 3, or 4" });
+      }
+
+      if (typeof isRegular !== "boolean") {
+        return res.status(400).json({ message: "isRegular must be a boolean" });
+      }
+
+      const user = await storage.updateUserStudentStatus(userId, yearLevel, isRegular);
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating student status:", error);
+      res.status(500).json({ message: "Failed to update student status" });
+    }
+  });
+
+  // Admin-only endpoint to get student's assigned subjects
+  app.get("/api/admin/students/:studentId/assignments", isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      
+      // Only admins can view assignments
+      if (currentUser?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can view student assignments" });
+      }
+
+      const { studentId } = req.params;
+      const assignments = await storage.getStudentAssignments(studentId);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching student assignments:", error);
+      res.status(500).json({ message: "Failed to fetch student assignments" });
+    }
+  });
+
+  // Admin-only endpoint to assign a subject to a student
+  app.post("/api/admin/students/:studentId/subjects", isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      
+      // Only admins can assign subjects
+      if (currentUser?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can assign subjects" });
+      }
+
+      const { studentId } = req.params;
+      const { subjectId } = req.body;
+
+      if (!subjectId) {
+        return res.status(400).json({ message: "Subject ID is required" });
+      }
+
+      // Verify student exists
+      const student = await storage.getUser(studentId);
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+
+      // Verify subject exists
+      const subject = await storage.getSubject(subjectId);
+      if (!subject) {
+        return res.status(404).json({ message: "Subject not found" });
+      }
+
+      const assignment = await storage.assignSubjectToStudent({
+        studentId,
+        subjectId,
+        assignedBy: currentUser.id,
+      });
+      
+      res.json(assignment);
+    } catch (error: any) {
+      console.error("Error assigning subject:", error);
+      // Check for unique constraint violation
+      if (error.code === '23505') {
+        return res.status(409).json({ message: "This subject is already assigned to the student" });
+      }
+      res.status(500).json({ message: "Failed to assign subject" });
+    }
+  });
+
+  // Admin-only endpoint to remove a subject from a student
+  app.delete("/api/admin/students/:studentId/subjects/:subjectId", isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      
+      // Only admins can remove assignments
+      if (currentUser?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can remove subject assignments" });
+      }
+
+      const { studentId, subjectId } = req.params;
+      await storage.removeSubjectFromStudent(studentId, subjectId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing subject assignment:", error);
+      res.status(500).json({ message: "Failed to remove subject assignment" });
+    }
+  });
+
   // Object Storage routes for materials uploads
   app.post("/api/objects/upload", isAuthenticated, async (req: any, res) => {
     try {

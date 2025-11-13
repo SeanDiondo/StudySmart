@@ -7,6 +7,7 @@ import {
   studyMaterials,
   quizzes,
   quizAttempts,
+  studentSubjectAssignments,
   type User,
   type UpsertUser,
   type Subject,
@@ -21,6 +22,8 @@ import {
   type InsertQuiz,
   type QuizAttempt,
   type InsertQuizAttempt,
+  type StudentSubjectAssignment,
+  type InsertStudentSubjectAssignment,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -34,14 +37,21 @@ export interface IStorage {
   createTestUser(user: { email: string; password: string; firstName: string; lastName: string; role: "student" | "admin" }): Promise<User>;
   updateUserRole(id: string, role: "student" | "admin"): Promise<User>;
   updateUser(id: string, data: Partial<Pick<User, 'firstName' | 'lastName' | 'email'>>): Promise<User>;
+  updateUserStudentStatus(id: string, yearLevel: "1" | "2" | "3" | "4", isRegular: boolean): Promise<User>;
   deleteUser(id: string): Promise<void>;
   
   // Subject operations
   getSubjects(): Promise<Subject[]>;
   getSubject(id: string): Promise<Subject | undefined>;
+  getSubjectsForStudent(studentId: string): Promise<Subject[]>;
   createSubject(subject: InsertSubject): Promise<Subject>;
   updateSubject(id: string, subject: Partial<InsertSubject>): Promise<Subject>;
   deleteSubject(id: string): Promise<void>;
+  
+  // Student Subject Assignment operations
+  getStudentAssignments(studentId: string): Promise<StudentSubjectAssignment[]>;
+  assignSubjectToStudent(assignment: InsertStudentSubjectAssignment): Promise<StudentSubjectAssignment>;
+  removeSubjectFromStudent(studentId: string, subjectId: string): Promise<void>;
   
   // Study Plan operations
   getStudyPlan(userId: string): Promise<StudyPlan | undefined>;
@@ -132,6 +142,15 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async updateUserStudentStatus(id: string, yearLevel: "1" | "2" | "3" | "4", isRegular: boolean): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({ yearLevel, isRegular, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
   async deleteUser(id: string): Promise<void> {
     await db.delete(users).where(eq(users.id, id));
   }
@@ -144,6 +163,39 @@ export class DatabaseStorage implements IStorage {
   async getSubject(id: string): Promise<Subject | undefined> {
     const [subject] = await db.select().from(subjects).where(eq(subjects.id, id));
     return subject || undefined;
+  }
+
+  async getSubjectsForStudent(studentId: string): Promise<Subject[]> {
+    // Get student info to determine year level and regular status
+    const student = await this.getUser(studentId);
+    if (!student) return [];
+
+    // If student is regular, return all default subjects for their year level
+    if (student.isRegular && student.yearLevel) {
+      return await db
+        .select()
+        .from(subjects)
+        .where(
+          and(
+            eq(subjects.isDefault, true),
+            eq(subjects.yearLevel, student.yearLevel)
+          )
+        );
+    }
+
+    // If student is irregular, return only assigned subjects
+    const assignments = await db
+      .select({ subjectId: studentSubjectAssignments.subjectId })
+      .from(studentSubjectAssignments)
+      .where(eq(studentSubjectAssignments.studentId, studentId));
+
+    if (assignments.length === 0) return [];
+
+    const subjectIds = assignments.map(a => a.subjectId);
+    return await db
+      .select()
+      .from(subjects)
+      .where(sql`${subjects.id} IN (${sql.join(subjectIds.map(id => sql`${id}`), sql`, `)})`);
   }
 
   async createSubject(subjectData: InsertSubject): Promise<Subject> {
@@ -162,6 +214,33 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSubject(id: string): Promise<void> {
     await db.delete(subjects).where(eq(subjects.id, id));
+  }
+
+  // Student Subject Assignment operations
+  async getStudentAssignments(studentId: string): Promise<StudentSubjectAssignment[]> {
+    return await db
+      .select()
+      .from(studentSubjectAssignments)
+      .where(eq(studentSubjectAssignments.studentId, studentId));
+  }
+
+  async assignSubjectToStudent(assignment: InsertStudentSubjectAssignment): Promise<StudentSubjectAssignment> {
+    const [result] = await db
+      .insert(studentSubjectAssignments)
+      .values(assignment)
+      .returning();
+    return result;
+  }
+
+  async removeSubjectFromStudent(studentId: string, subjectId: string): Promise<void> {
+    await db
+      .delete(studentSubjectAssignments)
+      .where(
+        and(
+          eq(studentSubjectAssignments.studentId, studentId),
+          eq(studentSubjectAssignments.subjectId, subjectId)
+        )
+      );
   }
 
   // Study Plan operations
