@@ -57,6 +57,7 @@ export function NavHeader({ user }: NavHeaderProps) {
         { href: "/dashboard", label: "Dashboard" },
         { href: "/study-plans", label: "Study Plans" },
         { href: "/quizzes", label: "Quizzes" },
+        { href: "/exams", label: "Exams" },
         { href: "/materials", label: "Materials" },
         { href: "/performance", label: "Performance" },
       ]
