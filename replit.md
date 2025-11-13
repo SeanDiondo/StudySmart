@@ -28,6 +28,27 @@ The database uses Neon PostgreSQL and includes core tables such as `users`, `sub
 
 The system integrates with OpenAI's GPT-5 model for AI features. This includes dynamic quiz generation based on subject, difficulty, and question count, with structured JSON output and optional material context. AI also powers performance analysis by generating insights, identifying strengths/weaknesses, and providing personalized study recommendations. Rate limiting and retry logic are implemented for robust API interaction.
 
+### Email Reminder System
+
+The platform includes an automated email reminder system that helps students stay on track with their study schedules:
+
+-   **Scheduled Reminders**: A background scheduler runs every minute to check for upcoming study sessions. Reminders are sent 15 minutes and 5 minutes before each scheduled study time.
+-   **Personalized Content**: Each email includes complete study session details: subject name and code, year level, day of the week, start/end times, session duration, and study tips.
+-   **Resend Integration**: Utilizes Resend email service with HTML-formatted templates for professional, readable emails.
+-   **Duplicate Prevention**: In-memory tracking prevents duplicate reminder emails during the same time window.
+-   **Active Plans**: Only active study plans are monitored; reminders are sent for each subject in the student's study plan.
+
+The scheduler initializes on server startup and operates continuously in the background, matching current time against study plan time slots stored in the database.
+
+### Materials Organization
+
+Study materials are displayed in a subject-grouped layout on the Materials Library page:
+
+-   **Subject Grouping**: Materials are organized into sections by subject, making it easy to find all resources related to a specific topic (e.g., all "IT Era" materials appear together).
+-   **Visual Hierarchy**: Each subject section displays a header with the subject name, description, and a badge showing the material count.
+-   **Alphabetical Sorting**: Subject sections are sorted alphabetically for easy navigation.
+-   **Preserved Functionality**: Search and filter capabilities remain intact, working seamlessly with the grouped display.
+
 ## External Dependencies
 
 ### Third-Party Services
@@ -35,6 +56,7 @@ The system integrates with OpenAI's GPT-5 model for AI features. This includes d
 -   **Replit Platform Integration**: Used for authentication (Replit Auth via OIDC), environment variables, and development tools.
 -   **Neon PostgreSQL**: The primary serverless PostgreSQL database, utilizing `@neondatabase/serverless` for connection pooling.
 -   **OpenAI API**: Provides the GPT-5 model for AI-driven quiz generation and performance analysis.
+-   **Resend**: Email delivery service for automated study session reminders, integrated via Replit Connectors for secure API key management.
 
 ### UI Component Library
 
