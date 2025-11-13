@@ -48,6 +48,7 @@ export interface IStorage {
   getSubjects(): Promise<Subject[]>;
   getSubject(id: string): Promise<Subject | undefined>;
   getSubjectsForStudent(studentId: string): Promise<Subject[]>;
+  getSubjectProgramMappings(): Promise<Array<{ subjectId: string; programId: string }>>;
   createSubject(subject: InsertSubject): Promise<Subject>;
   updateSubject(id: string, subject: Partial<InsertSubject>): Promise<Subject>;
   deleteSubject(id: string): Promise<void>;
@@ -90,10 +91,11 @@ export interface IStorage {
   // Quiz operations
   getQuizzes(userId?: string, subjectId?: string): Promise<Quiz[]>;
   getAllQuizzes(): Promise<Quiz[]>;
+  getFilteredExamsForAdmin(filters: { programId?: string; yearLevel?: string; examType?: string; materialType?: string; subjectId?: string }): Promise<Quiz[]>;
   getQuiz(id: string): Promise<Quiz | undefined>;
   createQuiz(quiz: InsertQuiz): Promise<Quiz>;
   deleteQuiz(id: string): Promise<void>;
-  getAvailableExams(studentId: string, yearLevel?: string, subjectIds?: string[]): Promise<Array<Quiz & { attemptCount: number; lastAttemptAt: Date | null }>>;
+  getAvailableExams(studentId: string, yearLevel?: string, subjectIds?: string[], programId?: string): Promise<Array<Quiz & { attemptCount: number; lastAttemptAt: Date | null }>>;
   
   // Quiz Attempt operations
   getQuizAttempts(userId: string, quizId?: string): Promise<QuizAttempt[]>;
@@ -579,6 +581,55 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(quizzes);
   }
 
+  async getFilteredExamsForAdmin(filters: { programId?: string; yearLevel?: string; examType?: string; materialType?: string; subjectId?: string }): Promise<Quiz[]> {
+    // Build conditions array - always start with base condition
+    const conditions: any[] = [
+      sql`(${quizzes.examType} = 'pre_test' OR ${quizzes.examType} = 'post_test')`
+    ];
+
+    // Apply exam type filter
+    if (filters.examType && filters.examType !== 'all') {
+      conditions.push(eq(quizzes.examType, filters.examType as any));
+    }
+
+    // Apply material type filter
+    if (filters.materialType && filters.materialType !== 'all') {
+      conditions.push(eq(quizzes.materialType, filters.materialType as any));
+    }
+
+    // Apply subject filter
+    if (filters.subjectId && filters.subjectId !== 'all') {
+      conditions.push(eq(quizzes.subjectId, filters.subjectId));
+    }
+
+    // Apply year level filter (requires subjects join)
+    if (filters.yearLevel) {
+      conditions.push(eq(subjects.yearLevel, filters.yearLevel));
+    }
+
+    // Apply program filter (requires subjectPrograms join)
+    if (filters.programId) {
+      conditions.push(eq(subjectPrograms.programId, filters.programId));
+    }
+
+    // Build single query with proper joins - use innerJoin to ensure valid subjects
+    let query = db
+      .select({ quiz: quizzes })
+      .from(quizzes)
+      .innerJoin(subjects, eq(quizzes.subjectId, subjects.id));
+
+    // Conditionally add subjectPrograms innerJoin if program filter is specified
+    if (filters.programId) {
+      query = query.innerJoin(subjectPrograms, eq(subjects.id, subjectPrograms.subjectId)) as any;
+    }
+
+    // Execute query with all conditions - safe because conditions always has at least one element
+    const results = await query.where(conditions.length > 0 ? and(...conditions) : undefined);
+    
+    // Return only the quiz objects
+    return results.map((r: any) => r.quiz);
+  }
+
   async getQuiz(id: string): Promise<Quiz | undefined> {
     const [quiz] = await db.select().from(quizzes).where(eq(quizzes.id, id));
     return quiz || undefined;
@@ -612,33 +663,40 @@ export class DatabaseStorage implements IStorage {
       conditions.push(inArray(subjects.id, subjectIds));
     }
 
-    // Add program filter if provided
+    // Add program filter if provided - enforce program membership
     if (programId) {
       conditions.push(eq(subjectPrograms.programId, programId));
     }
 
-    // Build query with single where clause, joining with subjectPrograms for program filtering
-    const results = await db
+    // Build query with conditional subjectPrograms join for program scoping
+    let query = db
       .select({
         quiz: quizzes,
         attemptCount: sql<number>`CAST(COUNT(DISTINCT ${quizAttempts.id}) AS INTEGER)`.as('attempt_count'),
         lastAttemptAt: sql<Date | null>`MAX(${quizAttempts.createdAt})`.as('last_attempt_at'),
       })
       .from(quizzes)
-      .innerJoin(subjects, eq(quizzes.subjectId, subjects.id))
-      .leftJoin(subjectPrograms, eq(subjects.id, subjectPrograms.subjectId))
-      .leftJoin(
+      .innerJoin(subjects, eq(quizzes.subjectId, subjects.id));
+
+    // Only join subjectPrograms if programId is provided - enforces program scoping when available
+    if (programId) {
+      query = query.innerJoin(subjectPrograms, eq(subjects.id, subjectPrograms.subjectId)) as any;
+    }
+
+    query = query.leftJoin(
         quizAttempts,
         and(
           eq(quizAttempts.quizId, quizzes.id),
           eq(quizAttempts.userId, studentId)
         )
-      )
+      ) as any;
+
+    const results = await query
       .where(and(...conditions))
       .groupBy(quizzes.id);
 
     // Transform results to Quiz & { attemptCount, lastAttemptAt }
-    return results.map(row => ({
+    return results.map((row: any) => ({
       ...row.quiz,
       attemptCount: row.attemptCount || 0,
       lastAttemptAt: row.lastAttemptAt || null,

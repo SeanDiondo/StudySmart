@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,8 +43,21 @@ export default function AdminReports() {
     enabled: isAuthenticated,
   });
 
+  // Build URL with query params for server-side filtered exams - memoized to prevent refetch loops
+  const filteredExamsUrl = useMemo(() => {
+    const params = new URLSearchParams();
+    if (selectedProgram !== 'all') params.append('programId', selectedProgram);
+    if (selectedYearLevel !== 'all') params.append('yearLevel', selectedYearLevel);
+    if (selectedExamType !== 'all') params.append('examType', selectedExamType);
+    if (selectedMaterialType !== 'all') params.append('materialType', selectedMaterialType);
+    if (selectedSubject !== 'all') params.append('subjectId', selectedSubject);
+    const queryString = params.toString();
+    return `/api/admin/exams/filtered${queryString ? `?${queryString}` : ''}`;
+  }, [selectedProgram, selectedYearLevel, selectedExamType, selectedMaterialType, selectedSubject]);
+
+  // Use server-side filtered exams endpoint with reactive query params
   const { data: quizzes, isLoading: quizzesLoading } = useQuery<Quiz[]>({
-    queryKey: ["/api/admin/quizzes"],
+    queryKey: [filteredExamsUrl],
     enabled: isAuthenticated,
   });
 
@@ -55,55 +68,18 @@ export default function AdminReports() {
 
   const isLoading = subjectsLoading || quizzesLoading || attemptsLoading;
 
-  // Filter quizzes to only show Pre-Tests and Post-Tests
-  const exams = (quizzes || []).filter(q => q.examType === 'pre_test' || q.examType === 'post_test');
+  // Server already filters by program, yearLevel, examType, materialType, and subjectId
+  // We only need to apply client-side search filtering
+  const exams = quizzes || [];
 
-  // Apply filters
   const filteredExams = exams.filter(exam => {
-    const subject = subjects?.find(s => s.id === exam.subjectId);
-    
-    // Search filter
-    if (searchQuery && !exam.title.toLowerCase().includes(searchQuery.toLowerCase()) && 
-        !(subject?.name?.toLowerCase() || "").includes(searchQuery.toLowerCase())) {
-      return false;
+    // Search filter (not handled server-side)
+    if (searchQuery) {
+      const subject = subjects?.find(s => s.id === exam.subjectId);
+      const matchesTitle = exam.title.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSubject = (subject?.name?.toLowerCase() || "").includes(searchQuery.toLowerCase());
+      return matchesTitle || matchesSubject;
     }
-
-    // Program filter - filter by checking if subject belongs to the selected program
-    // Since we don't have subject-program mappings in the frontend yet,
-    // we skip program filtering for now and rely on subject filtering
-    // TODO: Implement full program filtering with subject-program mappings
-    if (selectedProgram !== 'all') {
-      // For now, program filter is informational only
-      // Full implementation would require fetching subject-program mappings
-    }
-
-    // Year level filter - skip if subjects still loading, filter out if subject missing when loaded
-    if (selectedYearLevel !== 'all') {
-      if (!subjects) {
-        // Subjects still loading, allow exam through for now
-        return true;
-      }
-      if (!subject || subject.yearLevel !== selectedYearLevel) {
-        // Subject data loaded but missing/wrong year level
-        return false;
-      }
-    }
-
-    // Exam type filter
-    if (selectedExamType !== 'all' && exam.examType !== selectedExamType) {
-      return false;
-    }
-
-    // Material type filter
-    if (selectedMaterialType !== 'all' && exam.materialType !== selectedMaterialType) {
-      return false;
-    }
-
-    // Subject filter
-    if (selectedSubject !== 'all' && exam.subjectId !== selectedSubject) {
-      return false;
-    }
-
     return true;
   });
 

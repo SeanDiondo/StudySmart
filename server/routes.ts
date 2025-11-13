@@ -376,6 +376,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get subject-program mappings for filtering
+  app.get("/api/subject-programs", isAuthenticated, async (req, res) => {
+    try {
+      const mappings = await storage.getSubjectProgramMappings();
+      res.json(mappings);
+    } catch (error) {
+      console.error("Error fetching subject-program mappings:", error);
+      res.status(500).json({ message: "Failed to fetch subject-program mappings" });
+    }
+  });
+
   // Get filtered subjects for the current student (year-level or assigned)
   app.get("/api/subjects/for-student", isAuthenticated, async (req: any, res) => {
     try {
@@ -1162,6 +1173,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching all quizzes:", error);
       res.status(500).json({ message: "Failed to fetch quizzes" });
+    }
+  });
+
+  // Get filtered exams for admin reports with server-side filtering
+  app.get("/api/admin/exams/filtered", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { programId, yearLevel, examType, materialType, subjectId } = req.query;
+      
+      const exams = await storage.getFilteredExamsForAdmin({
+        programId: programId && programId !== 'all' ? programId as string : undefined,
+        yearLevel: yearLevel && yearLevel !== 'all' ? yearLevel as string : undefined,
+        examType: examType && examType !== 'all' ? examType as string : undefined,
+        materialType: materialType && materialType !== 'all' ? materialType as string : undefined,
+        subjectId: subjectId && subjectId !== 'all' ? subjectId as string : undefined,
+      });
+
+      res.json(exams);
+    } catch (error) {
+      console.error("Error fetching filtered exams:", error);
+      res.status(500).json({ message: "Failed to fetch filtered exams" });
     }
   });
 
