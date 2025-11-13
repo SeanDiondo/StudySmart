@@ -243,6 +243,8 @@ This is an automated reminder from CCIT Study Plan.
 Keep up the great work!
     `.trim();
     
+    console.log(`📧 Attempting to send email from ${fromEmail} to ${data.recipientEmail}`);
+    
     const result = await client.emails.send({
       from: fromEmail,
       to: data.recipientEmail,
@@ -251,10 +253,18 @@ Keep up the great work!
       text: textContent,
     });
     
+    // Check for Resend API errors
+    if (result.error) {
+      console.error('❌ Resend API error:', JSON.stringify(result.error));
+      throw new Error(`Resend error: ${result.error.message || JSON.stringify(result.error)}`);
+    }
+    
+    console.log(`✓ Study reminder sent successfully! Email ID:`, result.data?.id);
     console.log(`✓ Study reminder sent to ${data.recipientEmail} for ${data.subjectName} (${data.minutesUntilStart}min)`);
     return result;
-  } catch (error) {
-    console.error('Error sending study reminder:', error);
+  } catch (error: any) {
+    console.error('❌ Error sending study reminder:', error);
+    console.error('Error details:', error.message, error.stack);
     throw error;
   }
 }
