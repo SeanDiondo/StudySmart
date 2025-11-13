@@ -29,7 +29,7 @@ import {
   type InsertStudentSubjectAssignment,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -86,6 +86,7 @@ export interface IStorage {
   
   // Quiz operations
   getQuizzes(userId?: string, subjectId?: string): Promise<Quiz[]>;
+  getAllQuizzes(): Promise<Quiz[]>;
   getQuiz(id: string): Promise<Quiz | undefined>;
   createQuiz(quiz: InsertQuiz): Promise<Quiz>;
   deleteQuiz(id: string): Promise<void>;
@@ -93,6 +94,7 @@ export interface IStorage {
   
   // Quiz Attempt operations
   getQuizAttempts(userId: string, quizId?: string): Promise<QuizAttempt[]>;
+  getAllQuizAttempts(): Promise<QuizAttempt[]>;
   getQuizAttempt(id: string): Promise<QuizAttempt | undefined>;
   createQuizAttempt(attempt: InsertQuizAttempt): Promise<QuizAttempt>;
   getUserPerformanceStats(userId: string): Promise<any>;
@@ -469,6 +471,11 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(quizzes).where(eq(quizzes.isArchived, false));
   }
 
+  async getAllQuizzes(): Promise<Quiz[]> {
+    // Admin endpoint - get all quizzes including archived
+    return await db.select().from(quizzes);
+  }
+
   async getQuiz(id: string): Promise<Quiz | undefined> {
     const [quiz] = await db.select().from(quizzes).where(eq(quizzes.id, id));
     return quiz || undefined;
@@ -542,6 +549,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(quizAttempts)
       .where(eq(quizAttempts.userId, userId))
+      .orderBy(desc(quizAttempts.createdAt));
+  }
+
+  async getAllQuizAttempts(): Promise<QuizAttempt[]> {
+    // Admin endpoint - get all quiz attempts
+    return await db
+      .select()
+      .from(quizAttempts)
       .orderBy(desc(quizAttempts.createdAt));
   }
 

@@ -1031,6 +1031,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin Quiz endpoints
+  app.get("/api/admin/quizzes", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Get all quizzes for admins (no userId filter)
+      const quizzes = await storage.getAllQuizzes();
+      res.json(quizzes);
+    } catch (error) {
+      console.error("Error fetching all quizzes:", error);
+      res.status(500).json({ message: "Failed to fetch quizzes" });
+    }
+  });
+
+  app.get("/api/admin/quiz-attempts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Get all quiz attempts for admins (no userId filter)
+      const attempts = await storage.getAllQuizAttempts();
+      res.json(attempts);
+    } catch (error) {
+      console.error("Error fetching all quiz attempts:", error);
+      res.status(500).json({ message: "Failed to fetch quiz attempts" });
+    }
+  });
+
   app.get("/api/quizzes", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

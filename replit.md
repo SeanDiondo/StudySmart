@@ -87,9 +87,23 @@ The platform includes an automated exam generation system that creates Pre-Tests
 -   **Database Integration**: Generated quizzes are stored with proper `examType` (pre_test/post_test), `materialType` (midterm/finals), and linked to material sets via foreign keys.
 -   **Admin Feedback**: Console logs track generation progress with clear status messages and error reporting.
 
-**Future Phases:**
+**Phase 3 - Student Exam Dashboard & Admin Reports (Implemented):**
 
--   Phase 3: Student dashboard integration to display available exams with notifications and comprehensive reporting for administrators
+-   **Student Dashboard Integration:**
+    -   Added "Available Exams" section displaying Pre-Tests and Post-Tests based on student's year level and study plan
+    -   Subject resolution: Active study plan → Irregular student assignments → Year-level defaults
+    -   Exam cards show: Title, subject, exam type badge, material type badge, attempt metadata (count + last attempt date)
+    -   "Take Exam" or "Retake Exam" buttons linking to quiz interface
+    -   Backend endpoint: `GET /api/exams/available` with smart filtering by examType, yearLevel, and subjectIds
+    -   Updated quiz access: Students can now access pre_test/post_test quizzes regardless of creator
+
+-   **Admin Reports System:**
+    -   New Reports page at `/admin/reports` with comprehensive exam analytics
+    -   Overall statistics: Total exams, total attempts, unique students participated, average score
+    -   Advanced filtering: Search, year level, exam type (Pre-Test/Post-Test), material type (Midterm/Finals), subject
+    -   Statistics table displaying per-exam: Title, subject, type badges, attempt count, unique students, average score
+    -   Color-coded scores: Green (≥70%), yellow (≥50%), red (<50%)
+    -   Admin endpoints: `GET /api/admin/quizzes` and `GET /api/admin/quiz-attempts` for comprehensive data access
 
 ## External Dependencies
 

@@ -140,6 +140,76 @@ export default function StudentDashboard() {
         ))}
       </div>
 
+      {/* Available Exams */}
+      {availableExams && availableExams.length > 0 && (
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-2xl font-semibold font-display">
+              Available Exams
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Pre-Tests and Post-Tests based on your study materials
+            </p>
+          </div>
+          <div className="grid md:grid-cols-2 gap-4">
+            {availableExams.map((exam) => {
+              const subject = subjects?.find(s => s.id === exam.subjectId);
+              const examTypeBadge = exam.examType === 'pre_test' ? 'Pre-Test' : 'Post-Test';
+              const materialTypeBadge = exam.materialType === 'midterm' ? 'Midterm' : 'Finals';
+              const attemptText = exam.attemptCount === 0 
+                ? 'Not Taken' 
+                : `Taken ${exam.attemptCount} ${exam.attemptCount === 1 ? 'time' : 'times'}`;
+              
+              return (
+                <Card key={exam.id} className="hover-elevate">
+                  <CardHeader>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-lg font-semibold break-words">
+                          {exam.title}
+                        </CardTitle>
+                        <CardDescription className="mt-1">
+                          {subject?.name || 'Unknown Subject'}
+                        </CardDescription>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="default" data-testid={`badge-exam-type-${exam.id}`}>
+                          {examTypeBadge}
+                        </Badge>
+                        <Badge variant="secondary" data-testid={`badge-material-type-${exam.id}`}>
+                          {materialTypeBadge}
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <FileCheck2 className="h-4 w-4" />
+                        <span data-testid={`text-attempt-count-${exam.id}`}>{attemptText}</span>
+                        {exam.lastAttemptAt && (
+                          <span className="text-xs">
+                            · Last: {new Date(exam.lastAttemptAt).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                      <Link href={`/quiz/${exam.id}`}>
+                        <Button 
+                          size="sm" 
+                          data-testid={`button-take-exam-${exam.id}`}
+                        >
+                          {exam.attemptCount > 0 ? 'Retake Exam' : 'Take Exam'}
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Your Study Plans */}
       {studyPlans && studyPlans.length > 0 && (
         <div className="space-y-4">
