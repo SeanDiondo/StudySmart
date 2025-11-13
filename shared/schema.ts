@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, json, pgEnum, index, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, json, pgEnum, index, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -7,6 +7,7 @@ import { z } from "zod";
 export const userRoleEnum = pgEnum("user_role", ["student", "admin"]);
 export const difficultyEnum = pgEnum("difficulty", ["easy", "medium", "hard"]);
 export const dayOfWeekEnum = pgEnum("day_of_week", ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]);
+export const yearLevelEnum = pgEnum("year_level", ["1", "2", "3", "4"]);
 
 // Session storage table (required for Replit Auth)
 export const sessions = pgTable(
@@ -28,6 +29,8 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   role: userRoleEnum("role").notNull().default("student"),
+  yearLevel: yearLevelEnum("year_level").default("1"), // 1st to 4th year
+  isRegular: boolean("is_regular").notNull().default(true), // Regular vs irregular student
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -47,6 +50,7 @@ export const subjects = pgTable("subjects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   description: text("description"),
+  yearLevel: yearLevelEnum("year_level").default("1"), // Subject's year level (1-4)
   isDefault: boolean("is_default").notNull().default(false), // true for CCIT standard subjects
   userId: varchar("user_id").references(() => users.id), // null for default subjects, user id for custom subjects
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -59,6 +63,25 @@ export const insertSubjectSchema = createInsertSchema(subjects).omit({
 
 export type InsertSubject = z.infer<typeof insertSubjectSchema>;
 export type Subject = typeof subjects.$inferSelect;
+
+// Student Subject Assignments table (for irregular students - admin assigns specific subjects)
+export const studentSubjectAssignments = pgTable("student_subject_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  studentId: varchar("student_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  subjectId: varchar("subject_id").notNull().references(() => subjects.id, { onDelete: "cascade" }),
+  assignedBy: varchar("assigned_by").notNull().references(() => users.id), // Admin who assigned
+  assignedAt: timestamp("assigned_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("unique_student_subject").on(table.studentId, table.subjectId),
+]);
+
+export const insertStudentSubjectAssignmentSchema = createInsertSchema(studentSubjectAssignments).omit({
+  id: true,
+  assignedAt: true,
+});
+
+export type InsertStudentSubjectAssignment = z.infer<typeof insertStudentSubjectAssignmentSchema>;
+export type StudentSubjectAssignment = typeof studentSubjectAssignments.$inferSelect;
 
 // Study Plans table
 export const studyPlans = pgTable("study_plans", {
