@@ -4,7 +4,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { generateQuiz, analyzePerformance } from "./openai";
+import { generateQuiz, analyzePerformance, generateExamFromMaterials } from "./openai";
 import {
   insertSubjectSchema,
   insertStudyPlanSchema,
@@ -869,16 +869,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Mark the material set as completed
-      const materialSet = await storage.markMaterialSetCompleted({
+      // Get subject details
+      const subject = await storage.getSubject(subjectId);
+      if (!subject) {
+        return res.status(404).json({ message: "Subject not found" });
+      }
+
+      // Get system user for AI-generated quizzes
+      const systemUser = await storage.getUserByEmail("system@ccitstudy.local");
+      if (!systemUser) {
+        return res.status(500).json({ message: "System user not found. Please restart the application." });
+      }
+
+      // Prepare materials context for AI
+      const materialsForAI = materials.map(m => ({
+        title: m.title,
+        description: m.description || undefined
+      }));
+
+      // Generate Pre-Test
+      console.log(`⏳ Generating Pre-Test for ${subject.name} (${materialType})...`);
+      const preTestData = await generateExamFromMaterials(
+        subject.name,
+        materialType as "midterm" | "finals",
+        "pre_test",
+        materialsForAI
+      );
+
+      // Generate Post-Test
+      console.log(`⏳ Generating Post-Test for ${subject.name} (${materialType})...`);
+      const postTestData = await generateExamFromMaterials(
+        subject.name,
+        materialType as "midterm" | "finals",
+        "post_test",
+        materialsForAI
+      );
+
+      // Create Pre-Test quiz in database
+      const preTestQuiz = await storage.createQuiz({
+        userId: systemUser.id,
         subjectId,
-        materialType,
-        completedBy: user.id,
+        title: preTestData.title,
+        difficulty: "medium",
+        examType: "pre_test",
+        materialType: materialType as "midterm" | "finals",
+        questions: preTestData.questions,
       });
 
+      // Create Post-Test quiz in database
+      const postTestQuiz = await storage.createQuiz({
+        userId: systemUser.id,
+        subjectId,
+        title: postTestData.title,
+        difficulty: "medium",
+        examType: "post_test",
+        materialType: materialType as "midterm" | "finals",
+        questions: postTestData.questions,
+      });
+
+      // Mark the material set as completed with quiz IDs
+      const materialSet = await storage.markMaterialSetCompleted({
+        subjectId,
+        materialType: materialType as "midterm" | "finals",
+        completedBy: user.id,
+        preTestQuizId: preTestQuiz.id,
+        postTestQuizId: postTestQuiz.id,
+      });
+
+      console.log(`✓ Generated Pre-Test and Post-Test for ${subject.name} (${materialType})`);
       res.json(materialSet);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error marking material set as complete:", error);
+      
+      // Provide specific error messages
+      if (error.message?.includes("Failed to generate")) {
+        return res.status(500).json({ 
+          message: "Failed to generate exams using AI. Please try again later." 
+        });
+      }
+      
       res.status(500).json({ message: "Failed to mark material set as complete" });
     }
   });

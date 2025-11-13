@@ -17,6 +17,13 @@ export async function seedTestUsers() {
       lastName: "Admin",
       role: "admin" as const,
     },
+    {
+      email: "system@ccitstudy.local",
+      password: "SystemGenerated123!",
+      firstName: "AI",
+      lastName: "System",
+      role: "admin" as const,
+    },
   ];
 
   for (const user of testUsers) {

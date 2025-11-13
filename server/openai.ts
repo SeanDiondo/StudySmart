@@ -118,3 +118,77 @@ Identify specific topics they excel at and areas needing improvement. Provide ac
     throw new Error("Failed to analyze performance");
   }
 }
+
+export async function generateExamFromMaterials(
+  subjectName: string,
+  materialType: "midterm" | "finals",
+  examType: "pre_test" | "post_test",
+  materials: { title: string; description?: string }[]
+) {
+  const examTypeLabel = examType === "pre_test" ? "Pre-Test" : "Post-Test";
+  const materialTypeLabel = materialType === "midterm" ? "Midterm" : "Finals";
+  
+  const questionCount = examType === "pre_test" ? 15 : 20;
+  
+  const materialsContext = materials.length > 0 
+    ? `The exam should cover topics from these study materials:\n${materials.map((mat, idx) => {
+        const descPart = mat.description ? `\n   Description: ${mat.description}` : '';
+        return `${idx + 1}. ${mat.title}${descPart}`;
+      }).join('\n')}`
+    : '';
+
+  const prompt = `Generate a comprehensive ${examTypeLabel} for "${subjectName}" (${materialTypeLabel} period) with ${questionCount} multiple choice questions.
+
+${materialsContext}
+
+${examType === "pre_test" 
+  ? "This is a PRE-TEST designed to assess students' baseline knowledge BEFORE studying the materials. Questions should cover fundamental concepts and prerequisite knowledge that students should have or will learn from the materials." 
+  : "This is a POST-TEST designed to assess students' knowledge AFTER studying all the materials. Questions should be comprehensive, covering all major topics from the materials, and test deep understanding and application of concepts."}
+
+Return a JSON object with this exact structure:
+{
+  "title": "${subjectName} - ${materialTypeLabel} ${examTypeLabel}",
+  "questions": [
+    {
+      "questionText": "Question text here?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctAnswer": "Option A",
+      "explanation": "Why this is correct and why other options are incorrect"
+    }
+  ]
+}
+
+Make the questions educational, varied in difficulty, and test real understanding. Include detailed explanations for each answer.`;
+
+  try {
+    const response = await pRetry(
+      async () => {
+        try {
+          const completion = await openai.chat.completions.create({
+            model: "gpt-5",
+            messages: [{ role: "user", content: prompt }],
+            response_format: { type: "json_object" },
+            max_completion_tokens: 12000,
+          });
+          return completion.choices[0]?.message?.content || "{}";
+        } catch (error: any) {
+          if (isRateLimitError(error)) {
+            throw error;
+          }
+          throw new AbortError(error);
+        }
+      },
+      {
+        retries: 7,
+        minTimeout: 2000,
+        maxTimeout: 128000,
+        factor: 2,
+      }
+    );
+
+    return JSON.parse(response);
+  } catch (error) {
+    console.error(`Error generating ${examType} exam:`, error);
+    throw new Error(`Failed to generate ${examType} exam`);
+  }
+}
