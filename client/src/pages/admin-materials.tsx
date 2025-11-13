@@ -59,6 +59,7 @@ export default function AdminMaterials() {
     materialType: "",
     url: "",
   });
+  const [pendingSubjectSelections, setPendingSubjectSelections] = useState<Record<string, string>>({});
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
 
@@ -71,6 +72,12 @@ export default function AdminMaterials() {
   // Fetch subjects for dropdown
   const { data: subjects } = useQuery<Subject[]>({
     queryKey: ["/api/subjects"],
+    enabled: isAuthenticated,
+  });
+
+  // Fetch pending materials for validation
+  const { data: pendingMaterials } = useQuery<StudyMaterial[]>({
+    queryKey: ["/api/materials/pending"],
     enabled: isAuthenticated,
   });
 
@@ -177,6 +184,29 @@ export default function AdminMaterials() {
       toast({
         title: "Error",
         description: error.message || "Failed to mark material set as complete",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Resolve pending material mutation
+  const resolveMutation = useMutation({
+    mutationFn: async ({ materialId, subjectId }: { materialId: string; subjectId: string }) => {
+      const res = await apiRequest("POST", `/api/materials/${materialId}/resolve`, { subjectId });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/materials/pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/study-materials"] });
+      toast({
+        title: "Success!",
+        description: "Material resolved and mapped to subject successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to resolve material",
         variant: "destructive",
       });
     },
@@ -573,86 +603,197 @@ export default function AdminMaterials() {
         </Card>
       )}
 
-      {/* Search */}
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search materials..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-            data-testid="input-search-materials"
-          />
-        </div>
-      </div>
+      {/* Materials Tabs */}
+      <Tabs defaultValue="all" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="all" data-testid="tab-all-materials">
+            All Materials
+          </TabsTrigger>
+          <TabsTrigger value="pending" data-testid="tab-pending-validation">
+            Pending Validation
+            {pendingMaterials && pendingMaterials.length > 0 && (
+              <Badge variant="destructive" className="ml-2">
+                {pendingMaterials.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Materials Table */}
-      {filteredMaterials.length === 0 ? (
-        <EmptyState
-          icon={FileText}
-          title="No Materials Found"
-          description="Upload your first study material to get started"
-          actionLabel="Upload Material"
-          onAction={() => setIsUploadDialogOpen(true)}
-        />
-      ) : (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>URL</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Uploaded</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredMaterials.map((material) => (
-                  <TableRow key={material.id}>
-                    <TableCell className="font-medium">{material.title}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">
-                        {(subjects || []).find(s => s.id === material.subjectId)?.name || material.subjectId}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={material.materialType === "midterm" ? "default" : "outline"}>
-                        {material.materialType === "midterm" ? "Midterm" : "Finals"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {material.fileUrl}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {material.description || 'No description'}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {material.uploadedAt ? new Date(material.uploadedAt).toLocaleDateString() : 'N/A'}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(material.id)}
-                          data-testid={`button-delete-${material.id}`}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+        {/* All Materials Tab */}
+        <TabsContent value="all" className="space-y-6">
+          {/* Search */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search materials..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+                data-testid="input-search-materials"
+              />
+            </div>
+          </div>
+
+          {/* Materials Table */}
+          {filteredMaterials.length === 0 ? (
+            <EmptyState
+              icon={FileText}
+              title="No Materials Found"
+              description="Upload your first study material to get started"
+              actionLabel="Upload Material"
+              onAction={() => setIsUploadDialogOpen(true)}
+            />
+          ) : (
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Subject</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>URL</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Uploaded</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredMaterials.map((material) => (
+                      <TableRow key={material.id}>
+                        <TableCell className="font-medium">{material.title}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">
+                            {(subjects || []).find(s => s.id === material.subjectId)?.name || material.subjectId}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={material.materialType === "midterm" ? "default" : "outline"}>
+                            {material.materialType === "midterm" ? "Midterm" : "Finals"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {material.fileUrl}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {material.description || 'No description'}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {material.uploadedAt ? new Date(material.uploadedAt).toLocaleDateString() : 'N/A'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(material.id)}
+                              data-testid={`button-delete-${material.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Pending Validation Tab */}
+        <TabsContent value="pending" className="space-y-6">
+          {!pendingMaterials || pendingMaterials.length === 0 ? (
+            <EmptyState
+              icon={FileText}
+              title="No Pending Materials"
+              description="All materials have been validated and mapped to subjects"
+            />
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Pending Subject Validation</CardTitle>
+                <CardDescription>
+                  These materials have unrecognized subject names. Map them to existing subjects to resolve.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Unrecognized Subject</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Uploaded</TableHead>
+                      <TableHead>Map to Subject</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pendingMaterials.map((material) => (
+                      <TableRow key={material.id}>
+                        <TableCell className="font-medium">{material.title}</TableCell>
+                        <TableCell>
+                          <Badge variant="destructive">
+                            {material.rawSubjectName || "Unknown"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={material.materialType === "midterm" ? "default" : "outline"}>
+                            {material.materialType === "midterm" ? "Midterm" : "Finals"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {material.uploadedAt ? new Date(material.uploadedAt).toLocaleDateString() : 'N/A'}
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={pendingSubjectSelections[material.id] || ""}
+                            onValueChange={(value) => setPendingSubjectSelections({ ...pendingSubjectSelections, [material.id]: value })}
+                          >
+                            <SelectTrigger data-testid={`select-subject-${material.id}`}>
+                              <SelectValue placeholder="Select subject" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(subjects || []).map((subject) => (
+                                <SelectItem key={subject.id} value={subject.id}>
+                                  {subject.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            onClick={() => {
+                              const subjectId = pendingSubjectSelections[material.id];
+                              if (!subjectId) {
+                                toast({
+                                  title: "No Subject Selected",
+                                  description: "Please select a subject first",
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+                              resolveMutation.mutate({ materialId: material.id, subjectId });
+                            }}
+                            disabled={resolveMutation.isPending}
+                            data-testid={`button-resolve-${material.id}`}
+                          >
+                            {resolveMutation.isPending ? "Resolving..." : "Resolve"}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

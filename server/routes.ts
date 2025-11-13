@@ -800,6 +800,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get pending materials for subject validation
+  app.get("/api/materials/pending", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can view pending materials" });
+      }
+
+      const pendingMaterials = await storage.getPendingMaterials();
+      res.json(pendingMaterials);
+    } catch (error) {
+      console.error("Error fetching pending materials:", error);
+      res.status(500).json({ message: "Failed to fetch pending materials" });
+    }
+  });
+
+  // Resolve a pending material by mapping to a subject
+  const resolveMaterialSchema = z.object({
+    subjectId: z.string().min(1, "Subject ID is required"),
+  });
+
+  app.post("/api/materials/:id/resolve", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can resolve materials" });
+      }
+
+      const { subjectId } = resolveMaterialSchema.parse(req.body);
+
+      const material = await storage.resolvePendingMaterial({
+        materialId: req.params.id,
+        subjectId,
+        validatedBy: user.id,
+      });
+
+      res.json(material);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request", errors: error.errors });
+      }
+      
+      // Handle specific error messages from storage layer
+      const errorMessage = error.message || "Failed to resolve material";
+      const statusCode = errorMessage.includes("not found") ? 404 : 400;
+      
+      console.error("Error resolving material:", error);
+      res.status(statusCode).json({ message: errorMessage });
+    }
+  });
+
   // Download study material
   app.get("/api/study-materials/:id/download", isAuthenticated, async (req, res) => {
     try {

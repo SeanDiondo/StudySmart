@@ -79,6 +79,8 @@ export interface IStorage {
   createStudyMaterial(material: InsertStudyMaterial): Promise<StudyMaterial>;
   updateStudyMaterial(id: string, material: Partial<InsertStudyMaterial>): Promise<StudyMaterial>;
   deleteStudyMaterial(id: string): Promise<void>;
+  getPendingMaterials(): Promise<StudyMaterial[]>;
+  resolvePendingMaterial(params: {materialId: string, subjectId: string, validatedBy: string}): Promise<StudyMaterial>;
   
   // Material Set operations (Phase 1: Admin completion workflow)
   getMaterialSet(subjectId: string, materialType: "midterm" | "finals"): Promise<MaterialSet | undefined>;
@@ -426,6 +428,55 @@ export class DatabaseStorage implements IStorage {
 
   async deleteStudyMaterial(id: string): Promise<void> {
     await db.delete(studyMaterials).where(eq(studyMaterials.id, id));
+  }
+
+  async getPendingMaterials(): Promise<StudyMaterial[]> {
+    return await db
+      .select()
+      .from(studyMaterials)
+      .where(eq(studyMaterials.subjectValidationStatus, "pending"))
+      .orderBy(desc(studyMaterials.uploadedAt));
+  }
+
+  async resolvePendingMaterial(params: {
+    materialId: string;
+    subjectId: string;
+    validatedBy: string;
+  }): Promise<StudyMaterial> {
+    const { materialId, subjectId, validatedBy } = params;
+    
+    // Verify material exists and is pending
+    const existingMaterial = await this.getStudyMaterial(materialId);
+    if (!existingMaterial) {
+      throw new Error("Material not found");
+    }
+    if (existingMaterial.subjectValidationStatus !== "pending") {
+      throw new Error("Material is not in pending status");
+    }
+    
+    // Verify subject exists
+    const subject = await this.getSubject(subjectId);
+    if (!subject) {
+      throw new Error("Subject not found");
+    }
+    
+    const [material] = await db
+      .update(studyMaterials)
+      .set({
+        subjectId,
+        subjectValidationStatus: "valid",
+        validatedBy,
+        validatedAt: new Date(),
+        rawSubjectName: null,
+      })
+      .where(eq(studyMaterials.id, materialId))
+      .returning();
+    
+    if (!material) {
+      throw new Error("Failed to update material");
+    }
+    
+    return material;
   }
 
   // Material Set operations (Phase 1: Admin completion workflow)
