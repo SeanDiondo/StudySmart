@@ -95,6 +95,15 @@ export default function Login() {
               </Button>
             </form>
 
+            <div className="mt-6 text-center text-sm">
+              <span className="text-muted-foreground">Don't have an account? </span>
+              <Link href="/signup">
+                <span className="text-primary hover:underline cursor-pointer font-medium" data-testid="link-signup">
+                  Sign up
+                </span>
+              </Link>
+            </div>
+
             <div className="mt-4 p-3 bg-muted/50 rounded-md text-xs space-y-1">
               <p className="font-semibold text-foreground">Test Credentials:</p>
               <p className="text-muted-foreground">Student: student@test.com / Study123!</p>
