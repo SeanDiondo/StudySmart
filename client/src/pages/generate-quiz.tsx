@@ -35,6 +35,7 @@ export default function GenerateQuiz() {
   const form = useForm<QuizGenerationForm>({
     resolver: zodResolver(quizGenerationSchema),
     defaultValues: {
+      subjectId: "",
       difficulty: "medium",
       questionCount: 10,
     },
