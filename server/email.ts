@@ -57,6 +57,15 @@ export interface StudyReminderData {
   minutesUntilStart: number;
 }
 
+export interface ExamAvailabilityData {
+  recipientEmail: string;
+  recipientName: string;
+  subjectName: string;
+  subjectCode?: string;
+  yearLevel: string;
+  materialType: "midterm" | "finals";
+}
+
 export async function sendStudyReminder(data: StudyReminderData) {
   try {
     const { client, fromEmail } = await getUncachableResendClient();
@@ -266,6 +275,227 @@ Keep up the great work!
     return result;
   } catch (error: any) {
     console.error('❌ Error sending study reminder:', error);
+    console.error('Error details:', error.message, error.stack);
+    throw error;
+  }
+}
+
+export async function sendExamAvailabilityNotification(data: ExamAvailabilityData) {
+  try {
+    const { client, fromEmail } = await getUncachableResendClient();
+    
+    const materialTypeDisplay = data.materialType.charAt(0).toUpperCase() + data.materialType.slice(1);
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .container {
+              background-color: #ffffff;
+              border-radius: 8px;
+              padding: 30px;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+            }
+            .logo {
+              font-size: 24px;
+              font-weight: bold;
+              color: #2563eb;
+              margin-bottom: 10px;
+            }
+            .alert {
+              background-color: #dbeafe;
+              border-left: 4px solid #2563eb;
+              padding: 15px;
+              margin-bottom: 20px;
+              border-radius: 4px;
+            }
+            .alert-title {
+              font-weight: bold;
+              color: #1e40af;
+              margin-bottom: 5px;
+            }
+            .detail-section {
+              background-color: #f9fafb;
+              border-radius: 6px;
+              padding: 20px;
+              margin: 20px 0;
+            }
+            .detail-row {
+              display: flex;
+              justify-content: space-between;
+              padding: 10px 0;
+              border-bottom: 1px solid #e5e7eb;
+            }
+            .detail-row:last-child {
+              border-bottom: none;
+            }
+            .detail-label {
+              font-weight: 600;
+              color: #6b7280;
+            }
+            .detail-value {
+              color: #111827;
+              font-weight: 500;
+            }
+            .subject-highlight {
+              font-size: 20px;
+              color: #2563eb;
+              font-weight: bold;
+            }
+            .cta-button {
+              display: inline-block;
+              background-color: #2563eb;
+              color: #ffffff;
+              text-decoration: none;
+              padding: 12px 24px;
+              border-radius: 6px;
+              font-weight: 600;
+              margin: 20px 0;
+              text-align: center;
+            }
+            .exam-list {
+              background-color: #eff6ff;
+              border-radius: 6px;
+              padding: 15px;
+              margin: 15px 0;
+            }
+            .exam-item {
+              padding: 8px 0;
+              border-bottom: 1px solid #dbeafe;
+            }
+            .exam-item:last-child {
+              border-bottom: none;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 30px;
+              padding-top: 20px;
+              border-top: 1px solid #e5e7eb;
+              color: #6b7280;
+              font-size: 14px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="logo">📚 CCIT Study Plan</div>
+              <p style="color: #6b7280; margin: 0;">Your Personalized Learning Assistant</p>
+            </div>
+            
+            <div class="alert">
+              <div class="alert-title">🎯 New Exams Available!</div>
+              <div>Pre-Test and Post-Test are now ready for you to take</div>
+            </div>
+            
+            <h2 style="color: #111827; margin-bottom: 20px;">Hello ${data.recipientName},</h2>
+            
+            <p style="margin-bottom: 20px;">
+              Great news! New exams are now available for your course. Take these tests to assess your knowledge and track your progress.
+            </p>
+            
+            <div class="detail-section">
+              <div class="detail-row">
+                <span class="detail-label">Subject:</span>
+                <span class="subject-highlight">${data.subjectName}${data.subjectCode ? ` (${data.subjectCode})` : ''}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Year Level:</span>
+                <span class="detail-value">Year ${data.yearLevel}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Exam Period:</span>
+                <span class="detail-value">${materialTypeDisplay}</span>
+              </div>
+            </div>
+            
+            <div class="exam-list">
+              <h3 style="color: #1e40af; margin-top: 0;">📝 Available Exams:</h3>
+              <div class="exam-item">
+                <strong>Pre-Test:</strong> Assess your baseline knowledge before studying
+              </div>
+              <div class="exam-item">
+                <strong>Post-Test:</strong> Evaluate your understanding after completing the materials
+              </div>
+            </div>
+            
+            <p style="margin-top: 20px; padding: 15px; background-color: #fef3c7; border-radius: 6px; border-left: 4px solid #f59e0b;">
+              <strong>💡 Pro Tip:</strong> Take the Pre-Test first to identify knowledge gaps, study the materials, then complete the Post-Test to measure your improvement!
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <p style="color: #6b7280; margin-bottom: 10px;">Ready to start?</p>
+              <p style="color: #111827; font-size: 14px;">Log in to your dashboard to access your exams</p>
+            </div>
+            
+            <div class="footer">
+              <p>This is an automated notification from CCIT Study Plan</p>
+              <p style="margin-top: 5px;">Good luck with your exams! 🌟</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    const textContent = `
+CCIT Study Plan - New Exams Available
+
+New exams are now ready for you to take!
+
+Hello ${data.recipientName},
+
+Great news! New exams are now available for your course. Take these tests to assess your knowledge and track your progress.
+
+Subject: ${data.subjectName}${data.subjectCode ? ` (${data.subjectCode})` : ''}
+Year Level: Year ${data.yearLevel}
+Exam Period: ${materialTypeDisplay}
+
+Available Exams:
+- Pre-Test: Assess your baseline knowledge before studying
+- Post-Test: Evaluate your understanding after completing the materials
+
+Pro Tip: Take the Pre-Test first to identify knowledge gaps, study the materials, then complete the Post-Test to measure your improvement!
+
+Log in to your dashboard to access your exams.
+
+This is an automated notification from CCIT Study Plan.
+Good luck with your exams!
+    `.trim();
+    
+    console.log(`📧 Sending exam availability notification to ${data.recipientEmail}`);
+    
+    const result = await client.emails.send({
+      from: fromEmail,
+      to: data.recipientEmail,
+      subject: `🎯 New Exams Available: ${data.subjectName} - ${materialTypeDisplay}`,
+      html: htmlContent,
+      text: textContent,
+    });
+    
+    if (result.error) {
+      console.error('❌ Resend API error:', JSON.stringify(result.error));
+      throw new Error(`Resend error: ${result.error.message || JSON.stringify(result.error)}`);
+    }
+    
+    console.log(`✓ Exam availability notification sent successfully! Email ID:`, result.data?.id);
+    return result;
+  } catch (error: any) {
+    console.error('❌ Error sending exam availability notification:', error);
     console.error('Error details:', error.message, error.stack);
     throw error;
   }

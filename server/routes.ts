@@ -1069,6 +1069,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       console.log(`✓ Generated Pre-Test and Post-Test for ${subject.name} (${materialType})`);
+      
+      // Send email notifications to eligible students
+      try {
+        console.log(`📧 Sending exam availability notifications to eligible students...`);
+        
+        // Get all student users
+        const allUsers = await storage.getAllUsers();
+        const students = allUsers.filter(u => u.role === "student" && u.email);
+        
+        // Filter students who are eligible for this subject
+        let eligibleStudents = students;
+        
+        // Filter by year level if subject has one
+        if (subject.yearLevel) {
+          eligibleStudents = eligibleStudents.filter(s => s.yearLevel === subject.yearLevel);
+        }
+        
+        // Filter by program if subject has program assignments
+        const allSubjectPrograms = await storage.getSubjectProgramMappings();
+        const subjectPrograms = allSubjectPrograms.filter(sp => sp.subjectId === subjectId);
+        if (subjectPrograms.length > 0) {
+          const programIds = new Set(subjectPrograms.map((sp: { subjectId: string; programId: string }) => sp.programId));
+          eligibleStudents = eligibleStudents.filter(s => s.programId && programIds.has(s.programId));
+        }
+        
+        console.log(`📧 Found ${eligibleStudents.length} eligible students for notifications`);
+        
+        // Send notifications to all eligible students
+        const { sendExamAvailabilityNotification } = await import('./email');
+        let successCount = 0;
+        let failCount = 0;
+        
+        for (const student of eligibleStudents) {
+          try {
+            await sendExamAvailabilityNotification({
+              recipientEmail: student.email!,
+              recipientName: student.firstName || 'Student',
+              subjectName: subject.name,
+              subjectCode: subject.description?.match(/\((.*?)\)/)?.[1],
+              yearLevel: subject.yearLevel || '1',
+              materialType: materialType as "midterm" | "finals",
+            });
+            successCount++;
+          } catch (emailError) {
+            console.error(`Failed to send notification to ${student.email}:`, emailError);
+            failCount++;
+          }
+        }
+        
+        console.log(`✓ Exam availability notifications sent: ${successCount} successful, ${failCount} failed`);
+      } catch (notificationError) {
+        // Don't fail the entire request if notifications fail
+        console.error(`⚠️ Error sending exam availability notifications:`, notificationError);
+      }
+      
       res.json(materialSet);
     } catch (error: any) {
       console.error("❌ Error marking material set as complete:", error);

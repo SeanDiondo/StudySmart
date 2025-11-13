@@ -168,6 +168,12 @@ export default function AdminMaterials() {
     },
   });
 
+  // Track which material set is currently being processed
+  const [processingMaterialSet, setProcessingMaterialSet] = useState<{
+    subjectId: string;
+    materialType: string;
+  } | null>(null);
+
   // Mark material set complete mutation
   const markCompleteMutation = useMutation({
     mutationFn: async ({ subjectId, materialType }: { subjectId: string; materialType: "midterm" | "finals" }) => {
@@ -177,6 +183,10 @@ export default function AdminMaterials() {
       });
       const res = await apiRequest("POST", "/api/material-sets/mark-complete", { subjectId, materialType });
       return await res.json();
+    },
+    onMutate: ({ subjectId, materialType }) => {
+      // Track which material set is being processed
+      setProcessingMaterialSet({ subjectId, materialType });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/study-materials"] });
@@ -192,6 +202,10 @@ export default function AdminMaterials() {
         description: error.message || "Failed to generate exams. Please try again.",
         variant: "destructive",
       });
+    },
+    onSettled: () => {
+      // Clear processing state after mutation completes (success or error)
+      setProcessingMaterialSet(null);
     },
   });
 
@@ -639,7 +653,9 @@ export default function AdminMaterials() {
                       disabled={markCompleteMutation.isPending}
                       data-testid={`button-mark-complete-${group.subjectId}-${group.materialType}`}
                     >
-                      {markCompleteMutation.isPending ? "Processing..." : "Mark as Completed"}
+                      {processingMaterialSet?.subjectId === group.subjectId && 
+                       processingMaterialSet?.materialType === group.materialType 
+                        ? "Processing..." : "Mark as Completed"}
                     </Button>
                   )}
                 </div>
