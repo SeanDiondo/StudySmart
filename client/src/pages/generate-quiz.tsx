@@ -93,7 +93,7 @@ export default function GenerateQuiz() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Subject</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-subject">
                           <SelectValue placeholder="Select a subject" />
@@ -121,7 +121,7 @@ export default function GenerateQuiz() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Difficulty Level</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-difficulty">
                           <SelectValue />

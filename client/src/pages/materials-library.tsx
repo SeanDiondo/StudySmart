@@ -27,9 +27,9 @@ export default function MaterialsLibrary() {
     enabled: isAuthenticated,
   });
 
-  // Fetch subjects for filtering
+  // Fetch all subjects (not just for student) to properly display subject names for all materials
   const { data: subjects } = useQuery<Subject[]>({
-    queryKey: ["/api/subjects/for-student"],
+    queryKey: ["/api/subjects"],
     enabled: isAuthenticated,
   });
 
