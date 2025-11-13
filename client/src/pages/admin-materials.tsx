@@ -294,9 +294,7 @@ export default function AdminMaterials() {
   }, {} as Record<string, { subjectId: string; materialType: string; materials: StudyMaterial[] }>);
 
   const handleMarkComplete = (subjectId: string, materialType: "midterm" | "finals") => {
-    if (confirm(`Are you sure you want to mark this material set as complete? This will trigger AI exam generation.`)) {
-      markCompleteMutation.mutate({ subjectId, materialType });
-    }
+    markCompleteMutation.mutate({ subjectId, materialType });
   };
 
   return (

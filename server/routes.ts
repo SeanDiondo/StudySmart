@@ -895,6 +895,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "pre_test",
         materialsForAI
       );
+      console.log(`✓ Pre-Test generated: ${preTestData.title} (${preTestData.questions.length} questions)`);
 
       // Generate Post-Test
       console.log(`⏳ Generating Post-Test for ${subject.name} (${materialType})...`);
@@ -904,8 +905,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "post_test",
         materialsForAI
       );
+      console.log(`✓ Post-Test generated: ${postTestData.title} (${postTestData.questions.length} questions)`);
 
       // Create Pre-Test quiz in database
+      console.log(`💾 Creating Pre-Test quiz in database...`);
       const preTestQuiz = await storage.createQuiz({
         userId: systemUser.id,
         subjectId,
@@ -915,8 +918,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         materialType: materialType as "midterm" | "finals",
         questions: preTestData.questions,
       });
+      console.log(`✓ Pre-Test quiz created with ID: ${preTestQuiz.id}`);
 
       // Create Post-Test quiz in database
+      console.log(`💾 Creating Post-Test quiz in database...`);
       const postTestQuiz = await storage.createQuiz({
         userId: systemUser.id,
         subjectId,
@@ -926,8 +931,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         materialType: materialType as "midterm" | "finals",
         questions: postTestData.questions,
       });
+      console.log(`✓ Post-Test quiz created with ID: ${postTestQuiz.id}`);
 
       // Mark the material set as completed with quiz IDs
+      console.log(`💾 Marking material set as completed...`);
       const materialSet = await storage.markMaterialSetCompleted({
         subjectId,
         materialType: materialType as "midterm" | "finals",
@@ -939,16 +946,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`✓ Generated Pre-Test and Post-Test for ${subject.name} (${materialType})`);
       res.json(materialSet);
     } catch (error: any) {
-      console.error("Error marking material set as complete:", error);
+      console.error("❌ Error marking material set as complete:", error);
+      console.error("Error stack:", error.stack);
+      console.error("Error message:", error.message);
       
       // Provide specific error messages
       if (error.message?.includes("Failed to generate")) {
         return res.status(500).json({ 
-          message: "Failed to generate exams using AI. Please try again later." 
+          message: "Failed to generate exams using AI. Please try again later.",
+          error: error.message 
         });
       }
       
-      res.status(500).json({ message: "Failed to mark material set as complete" });
+      res.status(500).json({ 
+        message: "Failed to mark material set as complete",
+        error: error.message 
+      });
     }
   });
 
