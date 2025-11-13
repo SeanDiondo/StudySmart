@@ -71,12 +71,24 @@ The platform includes an automated exam generation system that creates Pre-Tests
 **Backend API:**
 
 -   `GET /api/material-sets/status`: Retrieves completion status for a specific subject+materialType combination
--   `POST /api/material-sets/mark-complete`: Marks a material set as completed (admin-only), validates that materials exist
+-   `POST /api/material-sets/mark-complete`: Marks a material set as completed (admin-only), validates materials exist, and triggers AI exam generation
 -   `GET /api/study-materials`: Enhanced with optional `materialType` query parameter for filtering
+
+**Phase 2 - AI Exam Generation (Implemented):**
+
+-   **Automated Exam Creation**: When administrators mark a material set as complete, the system automatically generates both Pre-Test and Post-Test using OpenAI GPT-5.
+-   **System User Attribution**: All AI-generated exams are attributed to a dedicated "AI System" user (system@ccitstudy.local) to maintain clean analytics and prevent skewing admin statistics.
+-   **Intelligent Question Generation**:
+    -   Pre-Tests: 15 questions designed to assess baseline/prerequisite knowledge before students study the materials
+    -   Post-Tests: 20 questions providing comprehensive assessment after studying all materials
+    -   Questions include detailed explanations for each answer
+-   **Enriched AI Context**: AI generation uses both material titles and descriptions to create relevant, topic-specific questions.
+-   **Sequential Generation**: Pre-Test is generated first, followed by Post-Test, with robust retry logic and error handling for API reliability.
+-   **Database Integration**: Generated quizzes are stored with proper `examType` (pre_test/post_test), `materialType` (midterm/finals), and linked to material sets via foreign keys.
+-   **Admin Feedback**: Console logs track generation progress with clear status messages and error reporting.
 
 **Future Phases:**
 
--   Phase 2: AI exam generation service that automatically creates Pre-Tests and Post-Tests when material sets are marked complete
 -   Phase 3: Student dashboard integration to display available exams with notifications and comprehensive reporting for administrators
 
 ## External Dependencies
