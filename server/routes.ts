@@ -1077,6 +1077,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Undo material set completion
+  app.post("/api/material-sets/undo", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can undo material set completion" });
+      }
+
+      const { subjectId, materialType } = req.body;
+      if (!subjectId || !materialType) {
+        return res.status(400).json({ message: "subjectId and materialType are required" });
+      }
+
+      console.log(`⏳ Undoing completion for material set: ${subjectId} (${materialType})...`);
+      
+      const materialSet = await storage.undoMaterialSetCompletion({
+        subjectId,
+        materialType: materialType as "midterm" | "finals",
+      });
+
+      console.log(`✓ Material set completion undone. Associated quizzes have been archived.`);
+      res.json(materialSet);
+    } catch (error: any) {
+      console.error("❌ Error undoing material set completion:", error);
+      res.status(500).json({ 
+        message: error.message || "Failed to undo material set completion",
+      });
+    }
+  });
+
   // Exam routes (Pre-Tests and Post-Tests)
   app.get("/api/exams/available", isAuthenticated, async (req: any, res) => {
     try {

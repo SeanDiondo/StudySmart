@@ -191,6 +191,29 @@ export default function AdminMaterials() {
     },
   });
 
+  // Undo material set completion mutation
+  const undoCompleteMutation = useMutation({
+    mutationFn: async ({ subjectId, materialType }: { subjectId: string; materialType: "midterm" | "finals" }) => {
+      const res = await apiRequest("POST", "/api/material-sets/undo", { subjectId, materialType });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/study-materials"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/material-sets/status"], exact: false });
+      toast({
+        title: "Success!",
+        description: "Material set completion undone. Associated exams have been archived.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to undo material set completion",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Resolve pending material mutation
   const resolveMutation = useMutation({
     mutationFn: async ({ materialId, subjectId }: { materialId: string; subjectId: string }) => {
@@ -329,6 +352,10 @@ export default function AdminMaterials() {
 
   const handleMarkComplete = (subjectId: string, materialType: "midterm" | "finals") => {
     markCompleteMutation.mutate({ subjectId, materialType });
+  };
+
+  const handleUndoComplete = (subjectId: string, materialType: "midterm" | "finals") => {
+    undoCompleteMutation.mutate({ subjectId, materialType });
   };
 
   return (
@@ -593,13 +620,24 @@ export default function AdminMaterials() {
                       </div>
                     </div>
                   </div>
-                  <Button
-                    onClick={() => handleMarkComplete(group.subjectId, group.materialType as "midterm" | "finals")}
-                    disabled={markCompleteMutation.isPending || isCompleted}
-                    data-testid={`button-mark-complete-${group.subjectId}-${group.materialType}`}
-                  >
-                    {markCompleteMutation.isPending ? "Processing..." : isCompleted ? "Already Completed" : "Mark as Completed"}
-                  </Button>
+                  {isCompleted ? (
+                    <Button
+                      variant="outline"
+                      onClick={() => handleUndoComplete(group.subjectId, group.materialType as "midterm" | "finals")}
+                      disabled={undoCompleteMutation.isPending}
+                      data-testid={`button-undo-complete-${group.subjectId}-${group.materialType}`}
+                    >
+                      {undoCompleteMutation.isPending ? "Undoing..." : "Undo Completion"}
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => handleMarkComplete(group.subjectId, group.materialType as "midterm" | "finals")}
+                      disabled={markCompleteMutation.isPending}
+                      data-testid={`button-mark-complete-${group.subjectId}-${group.materialType}`}
+                    >
+                      {markCompleteMutation.isPending ? "Processing..." : "Mark as Completed"}
+                    </Button>
+                  )}
                 </div>
               );
             })}

@@ -87,6 +87,7 @@ export interface IStorage {
   getMaterialSet(subjectId: string, materialType: "midterm" | "finals"): Promise<MaterialSet | undefined>;
   upsertMaterialSet(materialSetData: InsertMaterialSet): Promise<MaterialSet>;
   markMaterialSetCompleted(params: {subjectId: string, materialType: "midterm" | "finals", completedBy: string, preTestQuizId?: string, postTestQuizId?: string}): Promise<MaterialSet>;
+  undoMaterialSetCompletion(params: {subjectId: string, materialType: "midterm" | "finals"}): Promise<MaterialSet>;
   
   // Quiz operations
   getQuizzes(userId?: string, subjectId?: string): Promise<Quiz[]>;
@@ -551,6 +552,72 @@ export class DatabaseStorage implements IStorage {
     }
     
     return materialSet;
+  }
+
+  async undoMaterialSetCompletion(params: {
+    subjectId: string;
+    materialType: "midterm" | "finals";
+  }): Promise<MaterialSet> {
+    console.log(`🔍 Finding material set for subject ${params.subjectId}, type ${params.materialType}`);
+    const materialSet = await this.getMaterialSet(params.subjectId, params.materialType);
+    
+    if (!materialSet) {
+      console.error(`❌ Material set not found for subject ${params.subjectId}, type ${params.materialType}`);
+      throw new Error("Material set not found");
+    }
+
+    console.log(`📦 Found material set:`, { id: materialSet.id, isCompleted: materialSet.isCompleted, preTestQuizId: materialSet.preTestQuizId, postTestQuizId: materialSet.postTestQuizId });
+
+    if (!materialSet.isCompleted) {
+      console.error(`❌ Material set is not completed`);
+      throw new Error("Material set is not completed");
+    }
+
+    // Archive the associated quizzes (soft delete)
+    if (materialSet.preTestQuizId) {
+      console.log(`📝 Archiving Pre-Test quiz: ${materialSet.preTestQuizId}`);
+      const result = await db
+        .update(quizzes)
+        .set({ isArchived: true })
+        .where(eq(quizzes.id, materialSet.preTestQuizId))
+        .returning();
+      console.log(`✓ Pre-Test archived:`, result.length > 0 ? 'success' : 'no rows updated');
+    }
+
+    if (materialSet.postTestQuizId) {
+      console.log(`📝 Archiving Post-Test quiz: ${materialSet.postTestQuizId}`);
+      const result = await db
+        .update(quizzes)
+        .set({ isArchived: true })
+        .where(eq(quizzes.id, materialSet.postTestQuizId))
+        .returning();
+      console.log(`✓ Post-Test archived:`, result.length > 0 ? 'success' : 'no rows updated');
+    }
+
+    // Unmark the material set as completed
+    console.log(`📝 Updating material set to mark as not completed...`);
+    const [updatedSet] = await db
+      .update(materialSets)
+      .set({
+        isCompleted: false,
+        completedBy: null,
+        completedAt: null,
+        preTestQuizId: null,
+        postTestQuizId: null,
+      })
+      .where(and(
+        eq(materialSets.subjectId, params.subjectId),
+        eq(materialSets.materialType, params.materialType)
+      ))
+      .returning();
+
+    if (!updatedSet) {
+      console.error(`❌ Failed to update material set - no rows matched`);
+      throw new Error("Failed to update material set");
+    }
+
+    console.log(`✓ Material set updated successfully:`, { id: updatedSet.id, isCompleted: updatedSet.isCompleted });
+    return updatedSet;
   }
 
   // Quiz operations
