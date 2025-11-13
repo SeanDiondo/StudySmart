@@ -753,29 +753,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Material not found" });
       }
 
-      // If the fileUrl is a signed/external URL (contains :// for protocol or ? for query params),
-      // redirect to it directly without parsing to preserve signatures
-      if (material.fileUrl.includes('://') || material.fileUrl.includes('?')) {
-        // Signed URL, protocol-relative URL, or external URL - redirect directly
-        return res.redirect(material.fileUrl);
-      }
-
       const objectStorageService = new ObjectStorageService();
+      const fileUrl = material.fileUrl;
       
-      // Extract object path from the fileUrl
-      let objectPath = material.fileUrl;
+      // Classify the URL type and handle accordingly
+      // 1. Try to canonicalize (returns null for external URLs)
+      const canonicalPath = objectStorageService.canonicalizeObjectPath(fileUrl);
       
-      if (!objectPath.startsWith("/objects/")) {
-        // If it's a relative path, add /objects/ prefix
-        objectPath = `/objects/${objectPath}`;
+      if (canonicalPath === null) {
+        // External URL (non-GCS or external GCS) - redirect directly
+        return res.redirect(fileUrl);
       }
       
-      const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
+      // 2. Check if it's a legacy /objects/... path
+      if (canonicalPath.startsWith('/objects/')) {
+        // Legacy format - use streaming method
+        try {
+          const objectFile = await objectStorageService.getObjectEntityFile(canonicalPath);
+          res.setHeader('Content-Disposition', `attachment; filename="${material.fileName || 'download'}"`);
+          return await objectStorageService.downloadObject(objectFile, res);
+        } catch (error) {
+          console.error("Error streaming legacy object:", error);
+          if (error instanceof ObjectNotFoundError) {
+            return res.status(404).json({ message: "File not found" });
+          }
+          throw error;
+        }
+      }
       
-      // Set download headers
-      res.setHeader('Content-Disposition', `attachment; filename="${material.fileName || 'download'}"`);
-      
-      await objectStorageService.downloadObject(objectFile, res);
+      // 3. It's a normalized path - parse and generate fresh signed URL
+      try {
+        // Expected format: /bucket-name/path/to/object
+        const pathParts = canonicalPath.slice(1).split('/'); // Remove leading slash
+        
+        if (pathParts.length < 2) {
+          throw new Error("Invalid object path format - need bucket and object name");
+        }
+        
+        // Don't decode here - the path from canonicalization is already decoded
+        // Decoding individual segments would break object names with escaped characters like %2F
+        const bucketName = pathParts[0];
+        const objectName = pathParts.slice(1).join('/');
+        
+        // Generate a fresh signed URL for download (valid for 1 hour)
+        const signedUrl = await objectStorageService.getDownloadUrl(bucketName, objectName);
+        
+        // Redirect to the fresh signed URL
+        return res.redirect(signedUrl);
+      } catch (parseError) {
+        console.error("Error parsing object path for signing:", parseError, "Path:", canonicalPath);
+        return res.status(500).json({ message: "Failed to generate download URL" });
+      }
     } catch (error) {
       console.error("Error downloading material:", error);
       if (error instanceof ObjectNotFoundError) {

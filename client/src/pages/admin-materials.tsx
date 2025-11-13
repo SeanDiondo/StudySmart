@@ -176,9 +176,25 @@ export default function AdminMaterials() {
         return;
       }
       
+      // Extract the object path from the signed URL
+      // The URL format is: https://storage.googleapis.com/bucket/path/to/object?X-Goog-...
+      // We need to store just the path part (without query params) for generating fresh signed URLs later
+      let normalizedPath = fileUrl;
+      try {
+        const url = new URL(fileUrl);
+        // Extract pathname and strip query string
+        normalizedPath = url.pathname.split('?')[0];
+        // Ensure leading slash
+        if (!normalizedPath.startsWith('/')) {
+          normalizedPath = `/${normalizedPath}`;
+        }
+      } catch (e) {
+        console.warn("Could not parse upload URL, storing as-is:", e);
+      }
+      
       uploadMutation.mutate({
         ...uploadForm,
-        fileUrl: fileUrl,
+        fileUrl: normalizedPath,
         fileName: uploadedFile.name || "unknown",
         fileSize: uploadedFile.size || 0,
       });

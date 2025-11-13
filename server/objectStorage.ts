@@ -200,6 +200,101 @@ export class ObjectStorageService {
       requestedPermission: requestedPermission ?? ObjectPermission.READ,
     });
   }
+
+  async getDownloadUrl(bucketName: string, objectName: string, ttlSec: number = 3600): Promise<string> {
+    return signObjectURL({
+      bucketName,
+      objectName,
+      method: "GET",
+      ttlSec,
+    });
+  }
+
+  /**
+   * Canonicalize an object path from various URL formats to a normalized path
+   * that can be used for generating fresh signed URLs.
+   * 
+   * @param rawUrl - Can be:
+   *   - A signed GCS URL: https://storage.googleapis.com/bucket/path?X-Goog-...
+   *   - A normalized path: /bucket/path
+   *   - A legacy object ID: objects/123 or abc123
+   *   - An external URL: https://example.com/file.pdf
+   * @returns Normalized path like /bucket/path or null if it's an external URL
+   */
+  canonicalizeObjectPath(rawUrl: string): string | null {
+    // Strip any query string or hash fragments from the raw input
+    let cleanUrl = rawUrl.split('?')[0].split('#')[0];
+    
+    // If it's a URL, parse it
+    if (cleanUrl.includes('://') || cleanUrl.startsWith('http')) {
+      try {
+        const url = new URL(cleanUrl);
+        
+        // Check if it's a GCS URL
+        if (!url.hostname.includes('storage.googleapis.com')) {
+          // External non-GCS URL - return null to indicate redirect
+          return null;
+        }
+
+        // Extract pathname
+        let pathname = url.pathname;
+        
+        // Ensure leading slash
+        if (!pathname.startsWith('/')) {
+          pathname = `/${pathname}`;
+        }
+
+        // Check if this is from our private bucket
+        const privateDir = this.getPrivateObjectDir();
+        const normalizedPrivateDir = privateDir.startsWith('/') ? privateDir : `/${privateDir}`;
+        
+        if (!pathname.startsWith(normalizedPrivateDir)) {
+          // External GCS URL (not our bucket) - return null to indicate redirect
+          return null;
+        }
+
+        return pathname;
+      } catch (e) {
+        // URL parsing failed - fall through to path handling
+      }
+    }
+    
+    // At this point, it's a path or identifier
+    // Check if it starts with /objects/ (absolute legacy format)
+    if (cleanUrl.startsWith('/objects/')) {
+      return cleanUrl;
+    }
+    
+    // Check if it starts with 'objects/' (relative legacy format)
+    if (cleanUrl.startsWith('objects/')) {
+      return `/${cleanUrl}`;
+    }
+    
+    // Check if it's a plain identifier (no slashes at all)
+    if (!cleanUrl.includes('/')) {
+      // Treat as legacy object ID - normalize to /objects/ format
+      return `/objects/${cleanUrl}`;
+    }
+    
+    // For paths with slashes, determine if it's a legacy relative ID or a bucket path
+    // Get the bucket name from PRIVATE_OBJECT_DIR
+    const privateDir = this.getPrivateObjectDir();
+    const privateDirParts = privateDir.split('/').filter(p => p);
+    const bucketName = privateDirParts[0]; // First part is the bucket name
+    
+    // Check if the path starts with the known bucket name
+    const firstSegment = cleanUrl.startsWith('/') ? cleanUrl.slice(1).split('/')[0] : cleanUrl.split('/')[0];
+    
+    if (firstSegment === bucketName) {
+      // It's a bucket/object path - ensure leading slash
+      return cleanUrl.startsWith('/') ? cleanUrl : `/${cleanUrl}`;
+    }
+    
+    // Otherwise, it's a legacy relative ID (e.g., uploads/<id>)
+    // Normalize to /objects/ format
+    const id = cleanUrl.startsWith('/') ? cleanUrl.slice(1) : cleanUrl;
+    return `/objects/${id}`;
+  }
 }
 
 function parseObjectPath(path: string): {
