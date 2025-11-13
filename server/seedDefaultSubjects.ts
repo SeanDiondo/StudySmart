@@ -39,7 +39,7 @@ export async function seedDefaultSubjects() {
         );
 
       if (existing.length === 0) {
-        // Insert new subject
+        // Insert new subject only if it doesn't exist
         await db.insert(subjects).values({
           name: subject.name,
           description: `${subject.code} - ${subject.name}`,
@@ -47,17 +47,8 @@ export async function seedDefaultSubjects() {
           isDefault: true,
         });
         console.log(`⊳ Created default subject: ${subject.name} (Year ${subject.yearLevel})`);
-      } else {
-        // Update existing subject to ensure yearLevel is set correctly
-        await db
-          .update(subjects)
-          .set({ 
-            yearLevel: subject.yearLevel,
-            description: `${subject.code} - ${subject.name}`,
-          })
-          .where(eq(subjects.id, existing[0].id));
-        console.log(`⊳ Updated default subject: ${subject.name} (Year ${subject.yearLevel})`);
       }
+      // DO NOT update existing subjects - preserve admin changes
     }
     
     console.log("⊳ Default subjects seeding completed");
