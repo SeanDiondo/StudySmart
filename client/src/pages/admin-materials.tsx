@@ -36,7 +36,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { ObjectUploader } from "@/components/ObjectUploader";
-import type { StudyMaterial, Subject } from "@shared/schema";
+import type { StudyMaterial, Subject, MaterialSet } from "@shared/schema";
 import type { UploadResult } from "@uppy/core";
 
 export default function AdminMaterials() {
@@ -47,6 +47,7 @@ export default function AdminMaterials() {
     title: string;
     description: string;
     subjectId: string;
+    materialType: "midterm" | "finals" | "";
     url: string;
     fileUrl?: string;
     fileName?: string;
@@ -55,6 +56,7 @@ export default function AdminMaterials() {
     title: "",
     description: "",
     subjectId: "",
+    materialType: "",
     url: "",
   });
   const { toast } = useToast();
@@ -72,6 +74,46 @@ export default function AdminMaterials() {
     enabled: isAuthenticated,
   });
 
+  // Fetch material set status for all subject+materialType combinations
+  const materialSetPairs = (materials || []).reduce((acc, material) => {
+    const key = `${material.subjectId}::${material.materialType}`;
+    if (!acc.find(p => p.key === key)) {
+      acc.push({
+        key,
+        subjectId: material.subjectId,
+        materialType: material.materialType as "midterm" | "finals"
+      });
+    }
+    return acc;
+  }, [] as Array<{ key: string; subjectId: string; materialType: "midterm" | "finals" }>);
+
+  // Fetch all material set statuses in parallel using the default fetcher
+  const materialSetQueries = useQuery<Record<string, MaterialSet | null>>({
+    queryKey: ["/api/material-sets/status", ...materialSetPairs.map(p => p.key).sort()],
+    queryFn: async () => {
+      const results: Record<string, MaterialSet | null> = {};
+      await Promise.all(
+        materialSetPairs.map(async (pair) => {
+          try {
+            const response = await fetch(`/api/material-sets/status?subjectId=${pair.subjectId}&materialType=${pair.materialType}`, {
+              credentials: 'include'
+            });
+            if (response.ok) {
+              results[pair.key] = await response.json();
+            } else {
+              results[pair.key] = null;
+            }
+          } catch (error) {
+            console.error(`Error fetching material set status for ${pair.key}:`, error);
+            results[pair.key] = null;
+          }
+        })
+      );
+      return results;
+    },
+    enabled: isAuthenticated && materialSetPairs.length > 0,
+  });
+
   // Upload material mutation
   const uploadMutation = useMutation({
     mutationFn: async (data: typeof uploadForm) => {
@@ -85,7 +127,7 @@ export default function AdminMaterials() {
         description: "Material uploaded successfully",
       });
       setIsUploadDialogOpen(false);
-      setUploadForm({ title: "", description: "", subjectId: "", url: "" });
+      setUploadForm({ title: "", description: "", subjectId: "", materialType: "", url: "" });
     },
     onError: (error: any) => {
       toast({
@@ -117,12 +159,35 @@ export default function AdminMaterials() {
     },
   });
 
+  // Mark material set complete mutation
+  const markCompleteMutation = useMutation({
+    mutationFn: async ({ subjectId, materialType }: { subjectId: string; materialType: "midterm" | "finals" }) => {
+      const res = await apiRequest("POST", "/api/material-sets/mark-complete", { subjectId, materialType });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/study-materials"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/material-sets/status"], exact: false });
+      toast({
+        title: "Success!",
+        description: "Material set marked as completed. AI exam generation will begin shortly.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to mark material set as complete",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleUpload = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!uploadForm.title || !uploadForm.subjectId || (!uploadForm.url && uploadTab === "url")) {
+    if (!uploadForm.title || !uploadForm.subjectId || !uploadForm.materialType || (!uploadForm.url && uploadTab === "url")) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all required fields",
+        description: "Please fill in all required fields (title, subject, material type)",
         variant: "destructive",
       });
       return;
@@ -163,14 +228,15 @@ export default function AdminMaterials() {
       }
       
       // Validate required fields before submitting
-      if (!uploadForm.title?.trim() || !uploadForm.subjectId?.trim()) {
+      if (!uploadForm.title?.trim() || !uploadForm.subjectId?.trim() || !uploadForm.materialType) {
         const missingFields = [];
         if (!uploadForm.title?.trim()) missingFields.push("title");
         if (!uploadForm.subjectId?.trim()) missingFields.push("subject");
+        if (!uploadForm.materialType) missingFields.push("material type");
         
         toast({
           title: "Missing Information",
-          description: `Please fill in the ${missingFields.join(" and ")} before uploading`,
+          description: `Please fill in the ${missingFields.join(", ")} before uploading`,
           variant: "destructive",
         });
         return;
@@ -212,6 +278,26 @@ export default function AdminMaterials() {
       material.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (material.description && material.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+
+  // Group materials by subject and material type
+  const materialsBySubject = (materials || []).reduce((acc, material) => {
+    const key = `${material.subjectId}::${material.materialType}`;
+    if (!acc[key]) {
+      acc[key] = {
+        subjectId: material.subjectId,
+        materialType: material.materialType,
+        materials: [],
+      };
+    }
+    acc[key].materials.push(material);
+    return acc;
+  }, {} as Record<string, { subjectId: string; materialType: string; materials: StudyMaterial[] }>);
+
+  const handleMarkComplete = (subjectId: string, materialType: "midterm" | "finals") => {
+    if (confirm(`Are you sure you want to mark this material set as complete? This will trigger AI exam generation.`)) {
+      markCompleteMutation.mutate({ subjectId, materialType });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -278,6 +364,19 @@ export default function AdminMaterials() {
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="materialType">Material Type</Label>
+                  <Select required value={uploadForm.materialType} onValueChange={(value) => setUploadForm({ ...uploadForm, materialType: value as "midterm" | "finals" })}>
+                    <SelectTrigger id="materialType" data-testid="select-material-type">
+                      <SelectValue placeholder="Select material type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="midterm">Midterm</SelectItem>
+                      <SelectItem value="finals">Finals</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="description">Description (Optional)</Label>
                   <Textarea
                     id="description"
@@ -291,7 +390,7 @@ export default function AdminMaterials() {
 
                 <div className="space-y-2">
                   <Label>File Upload</Label>
-                  {uploadForm.title?.trim() && uploadForm.subjectId?.trim() ? (
+                  {uploadForm.title?.trim() && uploadForm.subjectId?.trim() && uploadForm.materialType ? (
                     <ObjectUploader
                       maxNumberOfFiles={1}
                       maxFileSize={52428800}
@@ -312,9 +411,10 @@ export default function AdminMaterials() {
                         const missingFields = [];
                         if (!uploadForm.title?.trim()) missingFields.push("title");
                         if (!uploadForm.subjectId?.trim()) missingFields.push("subject");
+                        if (!uploadForm.materialType) missingFields.push("material type");
                         toast({
                           title: "Missing Information",
-                          description: `Please fill in the ${missingFields.join(" and ")} before uploading a file`,
+                          description: `Please fill in the ${missingFields.join(", ")} before uploading a file`,
                           variant: "destructive",
                         });
                       }}
@@ -354,6 +454,19 @@ export default function AdminMaterials() {
                             {subject.name}
                           </SelectItem>
                         ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="materialType-url">Material Type</Label>
+                    <Select required value={uploadForm.materialType} onValueChange={(value) => setUploadForm({ ...uploadForm, materialType: value as "midterm" | "finals" })}>
+                      <SelectTrigger id="materialType-url" data-testid="select-material-type-url">
+                        <SelectValue placeholder="Select material type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="midterm">Midterm</SelectItem>
+                        <SelectItem value="finals">Finals</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -404,6 +517,64 @@ export default function AdminMaterials() {
         </Dialog>
       </div>
 
+      {/* Material Sets Completion Status */}
+      {Object.keys(materialsBySubject).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Material Set Status</CardTitle>
+            <CardDescription>
+              Mark material sets as complete to trigger AI-generated Pre-Tests and Post-Tests
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {Object.values(materialsBySubject).map((group) => {
+              const subject = (subjects || []).find(s => s.id === group.subjectId);
+              const materialCount = group.materials.length;
+              const key = `${group.subjectId}::${group.materialType}`;
+              const materialSet = materialSetQueries.data?.[key];
+              const isCompleted = materialSet?.isCompleted || false;
+              
+              return (
+                <div key={key} className="flex flex-wrap items-center justify-between gap-4 p-4 border rounded-md">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{subject?.name || "Unknown Subject"}</p>
+                        {isCompleted && (
+                          <Badge variant="default" className="bg-green-600">
+                            Completed
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant={group.materialType === "midterm" ? "default" : "outline"}>
+                          {group.materialType === "midterm" ? "Midterm" : "Finals"}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          {materialCount} material{materialCount !== 1 ? 's' : ''}
+                        </span>
+                        {isCompleted && materialSet?.completedAt && (
+                          <span className="text-sm text-muted-foreground">
+                            • Marked {new Date(materialSet.completedAt).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => handleMarkComplete(group.subjectId, group.materialType as "midterm" | "finals")}
+                    disabled={markCompleteMutation.isPending || isCompleted}
+                    data-testid={`button-mark-complete-${group.subjectId}-${group.materialType}`}
+                  >
+                    {markCompleteMutation.isPending ? "Processing..." : isCompleted ? "Already Completed" : "Mark as Completed"}
+                  </Button>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Search */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1 max-w-md">
@@ -435,6 +606,7 @@ export default function AdminMaterials() {
                 <TableRow>
                   <TableHead>Title</TableHead>
                   <TableHead>Subject</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>URL</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Uploaded</TableHead>
@@ -448,6 +620,11 @@ export default function AdminMaterials() {
                     <TableCell>
                       <Badge variant="secondary">
                         {(subjects || []).find(s => s.id === material.subjectId)?.name || material.subjectId}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={material.materialType === "midterm" ? "default" : "outline"}>
+                        {material.materialType === "midterm" ? "Midterm" : "Finals"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
