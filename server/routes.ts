@@ -999,24 +999,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: m.description || undefined
       }));
 
-      // Generate Pre-Test
-      console.log(`⏳ Generating Pre-Test for ${subject.name} (${materialType})...`);
-      const preTestData = await generateExamFromMaterials(
-        subject.name,
-        materialType as "midterm" | "finals",
-        "pre_test",
-        materialsForAI
-      );
+      // Generate Pre-Test and Post-Test IN PARALLEL (cuts time in half!)
+      console.log(`⏳ Generating Pre-Test and Post-Test for ${subject.name} (${materialType}) in parallel...`);
+      const [preTestResult, postTestResult] = await Promise.allSettled([
+        generateExamFromMaterials(
+          subject.name,
+          materialType as "midterm" | "finals",
+          "pre_test",
+          materialsForAI
+        ),
+        generateExamFromMaterials(
+          subject.name,
+          materialType as "midterm" | "finals",
+          "post_test",
+          materialsForAI
+        )
+      ]);
+
+      // Check if Pre-Test generation succeeded
+      if (preTestResult.status === "rejected") {
+        console.error(`❌ Pre-Test generation failed:`, preTestResult.reason);
+        throw new Error(`Failed to generate Pre-Test: ${preTestResult.reason.message || preTestResult.reason}`);
+      }
+      const preTestData = preTestResult.value;
       console.log(`✓ Pre-Test generated: ${preTestData.title} (${preTestData.questions.length} questions)`);
 
-      // Generate Post-Test
-      console.log(`⏳ Generating Post-Test for ${subject.name} (${materialType})...`);
-      const postTestData = await generateExamFromMaterials(
-        subject.name,
-        materialType as "midterm" | "finals",
-        "post_test",
-        materialsForAI
-      );
+      // Check if Post-Test generation succeeded
+      if (postTestResult.status === "rejected") {
+        console.error(`❌ Post-Test generation failed:`, postTestResult.reason);
+        throw new Error(`Failed to generate Post-Test: ${postTestResult.reason.message || postTestResult.reason}`);
+      }
+      const postTestData = postTestResult.value;
       console.log(`✓ Post-Test generated: ${postTestData.title} (${postTestData.questions.length} questions)`);
 
       // Create Pre-Test quiz in database

@@ -171,6 +171,10 @@ export default function AdminMaterials() {
   // Mark material set complete mutation
   const markCompleteMutation = useMutation({
     mutationFn: async ({ subjectId, materialType }: { subjectId: string; materialType: "midterm" | "finals" }) => {
+      toast({
+        title: "Generating Exams...",
+        description: "AI is generating Pre-Test and Post-Test. This takes about 30 seconds. Please wait...",
+      });
       const res = await apiRequest("POST", "/api/material-sets/mark-complete", { subjectId, materialType });
       return await res.json();
     },
@@ -179,13 +183,13 @@ export default function AdminMaterials() {
       queryClient.invalidateQueries({ queryKey: ["/api/material-sets/status"], exact: false });
       toast({
         title: "Success!",
-        description: "Material set marked as completed. AI exam generation will begin shortly.",
+        description: "Material set marked as completed. Pre-Test and Post-Test have been generated successfully.",
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to mark material set as complete",
+        title: "Generation Failed",
+        description: error.message || "Failed to generate exams. Please try again.",
         variant: "destructive",
       });
     },
