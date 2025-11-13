@@ -45,6 +45,22 @@ export default function MaterialsLibrary() {
     return matchesSearch && matchesSubject;
   });
 
+  // Group materials by subject
+  const materialsBySubject: Record<string, StudyMaterial[]> = {};
+  filteredMaterials.forEach((material) => {
+    if (!materialsBySubject[material.subjectId]) {
+      materialsBySubject[material.subjectId] = [];
+    }
+    materialsBySubject[material.subjectId].push(material);
+  });
+
+  // Sort subjects alphabetically
+  const sortedSubjectIds = Object.keys(materialsBySubject).sort((a, b) => {
+    const subjectA = subjectsData.find(s => s.id === a)?.name || '';
+    const subjectB = subjectsData.find(s => s.id === b)?.name || '';
+    return subjectA.localeCompare(subjectB);
+  });
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -85,7 +101,7 @@ export default function MaterialsLibrary() {
         {filteredMaterials.length} {filteredMaterials.length === 1 ? "material" : "materials"} found
       </div>
 
-      {/* Materials Grid */}
+      {/* Materials Grouped by Subject */}
       {filteredMaterials.length === 0 ? (
         <EmptyState
           icon={FileText}
@@ -93,44 +109,68 @@ export default function MaterialsLibrary() {
           description="Try adjusting your search criteria or filters"
         />
       ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredMaterials.map((material) => (
-            <Card key={material.id} className="hover-elevate">
-              <CardHeader>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 space-y-1">
-                    <CardTitle className="text-lg leading-tight">{material.title}</CardTitle>
-                    <Badge variant="secondary" className="text-xs">
-                      {subjectsData.find(s => s.id === material.subjectId)?.name || material.subjectId}
-                    </Badge>
+        <div className="space-y-8">
+          {sortedSubjectIds.map((subjectId) => {
+            const subject = subjectsData.find(s => s.id === subjectId);
+            const subjectMaterials = materialsBySubject[subjectId];
+            
+            return (
+              <div key={subjectId} className="space-y-4" data-testid={`subject-group-${subjectId}`}>
+                {/* Subject Header */}
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <h2 className="text-2xl font-bold font-display">
+                      {subject?.name || 'Unknown Subject'}
+                    </h2>
+                    {subject?.description && (
+                      <p className="text-sm text-muted-foreground mt-1">{subject.description}</p>
+                    )}
                   </div>
-                  <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <FileText className="h-6 w-6 text-primary" />
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <CardDescription className="line-clamp-2 leading-relaxed">
-                  {material.description}
-                </CardDescription>
-
-                <div className="flex items-center justify-between text-sm text-muted-foreground">
-                  <span>{material.uploadedAt ? new Date(material.uploadedAt).toLocaleDateString() : 'N/A'}</span>
+                  <Badge variant="secondary">
+                    {subjectMaterials.length} {subjectMaterials.length === 1 ? 'material' : 'materials'}
+                  </Badge>
                 </div>
 
-                <Button 
-                  className="w-full" 
-                  asChild
-                  data-testid={`button-download-${material.id}`}
-                >
-                  <a href={`/api/study-materials/${material.id}/download`} download={material.fileName}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Download
-                  </a>
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+                {/* Materials Grid for this Subject */}
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {subjectMaterials.map((material) => (
+                    <Card key={material.id} className="hover-elevate">
+                      <CardHeader>
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <CardTitle className="text-lg leading-tight">{material.title}</CardTitle>
+                          </div>
+                          <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <FileText className="h-6 w-6 text-primary" />
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <CardDescription className="line-clamp-2 leading-relaxed">
+                          {material.description}
+                        </CardDescription>
+
+                        <div className="flex items-center justify-between text-sm text-muted-foreground">
+                          <span>{material.uploadedAt ? new Date(material.uploadedAt).toLocaleDateString() : 'N/A'}</span>
+                        </div>
+
+                        <Button 
+                          className="w-full" 
+                          asChild
+                          data-testid={`button-download-${material.id}`}
+                        >
+                          <a href={`/api/study-materials/${material.id}/download`} download={material.fileName}>
+                            <Download className="h-4 w-4 mr-2" />
+                            Download
+                          </a>
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
