@@ -153,6 +153,7 @@ export const quizzes = pgTable("quizzes", {
   title: text("title").notNull(),
   difficulty: difficultyEnum("difficulty").notNull().default("medium"),
   questions: json("questions").$type<{questionText: string, options: string[], correctAnswer: string, explanation: string}[]>().notNull(),
+  isArchived: boolean("is_archived").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

@@ -358,17 +358,25 @@ export class DatabaseStorage implements IStorage {
 
   // Quiz operations
   async getQuizzes(userId?: string, subjectId?: string): Promise<Quiz[]> {
-    let query = db.select().from(quizzes);
-    
     if (userId && subjectId) {
-      return await query.where(and(eq(quizzes.userId, userId), eq(quizzes.subjectId, subjectId)));
+      return await db.select().from(quizzes).where(and(
+        eq(quizzes.userId, userId), 
+        eq(quizzes.subjectId, subjectId),
+        eq(quizzes.isArchived, false)
+      ));
     } else if (userId) {
-      return await query.where(eq(quizzes.userId, userId));
+      return await db.select().from(quizzes).where(and(
+        eq(quizzes.userId, userId),
+        eq(quizzes.isArchived, false)
+      ));
     } else if (subjectId) {
-      return await query.where(eq(quizzes.subjectId, subjectId));
+      return await db.select().from(quizzes).where(and(
+        eq(quizzes.subjectId, subjectId),
+        eq(quizzes.isArchived, false)
+      ));
     }
     
-    return await query;
+    return await db.select().from(quizzes).where(eq(quizzes.isArchived, false));
   }
 
   async getQuiz(id: string): Promise<Quiz | undefined> {
@@ -382,7 +390,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteQuiz(id: string): Promise<void> {
-    await db.delete(quizzes).where(eq(quizzes.id, id));
+    // Soft delete - archive the quiz instead of deleting it
+    await db.update(quizzes)
+      .set({ isArchived: true })
+      .where(eq(quizzes.id, id));
   }
 
   // Quiz Attempt operations

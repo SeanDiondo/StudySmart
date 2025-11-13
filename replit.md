@@ -22,6 +22,8 @@ The backend is built with Express.js and TypeScript, using Drizzle ORM for datab
 
 The database uses Neon PostgreSQL and includes core tables such as `users`, `subjects`, `study_plans`, `study_plan_subjects`, `study_materials`, `quizzes`, `quiz_attempts`, and `sessions`. Key design decisions include PostgreSQL enums, UUID primary keys, timestamp fields, JSONB fields for flexible data, and foreign key relationships with cascading deletes.
 
+**Soft Delete Implementation**: Quizzes use soft delete (archiving) to preserve student performance data. The `quizzes` table has an `isArchived` boolean field (default: false). When a quiz is "deleted", it's archived (`isArchived = true`) instead of being permanently removed. This preserves all quiz attempts and performance analytics while hiding the quiz from student-facing lists. Archived quizzes can still be accessed for reporting and analytics purposes.
+
 ### AI Integration
 
 The system integrates with OpenAI's GPT-5 model for AI features. This includes dynamic quiz generation based on subject, difficulty, and question count, with structured JSON output and optional material context. AI also powers performance analysis by generating insights, identifying strengths/weaknesses, and providing personalized study recommendations. Rate limiting and retry logic are implemented for robust API interaction.
