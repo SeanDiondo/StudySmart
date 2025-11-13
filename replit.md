@@ -76,7 +76,20 @@ The platform includes an automated exam generation system that creates Pre-Tests
 
 -   `GET /api/material-sets/status`: Retrieves completion status for a specific subject+materialType combination
 -   `POST /api/material-sets/mark-complete`: Marks a material set as completed (admin-only), validates materials exist, and triggers AI exam generation
+-   `POST /api/material-sets/undo`: Undoes material set completion (admin-only), archives associated exams, and allows re-marking as completed
 -   `GET /api/study-materials`: Enhanced with optional `materialType` query parameter for filtering
+
+**Undo Completion Feature:**
+
+-   **Purpose**: Allows administrators to undo accidental material set completions without losing data integrity
+-   **Process**: When undo is triggered, the system:
+    -   Archives (soft deletes) the associated Pre-Test and Post-Test quizzes by setting `isArchived = true`
+    -   Marks the material set as not completed (`isCompleted = false`)
+    -   Clears completion metadata (completedBy, completedAt, quiz references)
+    -   Allows the admin to re-mark the material set as completed if needed
+-   **Data Preservation**: Archived quizzes and their associated quiz attempts remain in the database for historical record and analytics, but are hidden from student-facing interfaces
+-   **UI Behavior**: Admin Materials page shows "Undo Completion" button for completed sets and "Mark as Completed" for non-completed sets
+-   **Logging**: Detailed console logging (🔍, 📦, 📝, ✓, ❌ markers) tracks the undo process for debugging and monitoring
 
 **Phase 2 - AI Exam Generation (Implemented):**
 
