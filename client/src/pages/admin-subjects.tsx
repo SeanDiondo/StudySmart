@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, Search, BookOpen } from "lucide-react";
@@ -21,6 +22,7 @@ export default function AdminSubjects() {
   const [subjectForm, setSubjectForm] = useState({
     name: "",
     description: "",
+    yearLevel: "1" as "1" | "2" | "3" | "4",
     isDefault: false,
   });
   const { toast } = useToast();
@@ -43,7 +45,7 @@ export default function AdminSubjects() {
         description: "Subject created successfully",
       });
       setIsCreateDialogOpen(false);
-      setSubjectForm({ name: "", description: "", isDefault: false });
+      setSubjectForm({ name: "", description: "", yearLevel: "1", isDefault: false });
     },
     onError: (error: any) => {
       toast({
@@ -67,7 +69,7 @@ export default function AdminSubjects() {
       });
       setIsEditDialogOpen(false);
       setEditingSubject(null);
-      setSubjectForm({ name: "", description: "", isDefault: false });
+      setSubjectForm({ name: "", description: "", yearLevel: "1", isDefault: false });
     },
     onError: (error: any) => {
       toast({
@@ -108,6 +110,7 @@ export default function AdminSubjects() {
     setSubjectForm({
       name: subject.name,
       description: subject.description || "",
+      yearLevel: subject.yearLevel || "1",
       isDefault: subject.isDefault,
     });
     setIsEditDialogOpen(true);
@@ -181,6 +184,23 @@ export default function AdminSubjects() {
                   data-testid="input-subject-description"
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="yearLevel">Year Level*</Label>
+                <Select
+                  value={subjectForm.yearLevel}
+                  onValueChange={(value) => setSubjectForm({ ...subjectForm, yearLevel: value as "1" | "2" | "3" | "4" })}
+                >
+                  <SelectTrigger data-testid="select-year-level">
+                    <SelectValue placeholder="Select year level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1st Year</SelectItem>
+                    <SelectItem value="2">2nd Year</SelectItem>
+                    <SelectItem value="3">3rd Year</SelectItem>
+                    <SelectItem value="4">4th Year</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -233,6 +253,7 @@ export default function AdminSubjects() {
                 <TableRow>
                   <TableHead>Subject Name</TableHead>
                   <TableHead>Description</TableHead>
+                  <TableHead>Year Level</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -243,6 +264,11 @@ export default function AdminSubjects() {
                     <TableCell className="font-medium">{subject.name}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {subject.description || "No description"}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm font-medium">
+                        {subject.yearLevel ? `Year ${subject.yearLevel}` : "N/A"}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <span className={`text-xs px-2 py-1 rounded ${subject.isDefault ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
@@ -308,6 +334,23 @@ export default function AdminSubjects() {
                 rows={3}
                 data-testid="input-edit-subject-description"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-yearLevel">Year Level*</Label>
+              <Select
+                value={subjectForm.yearLevel}
+                onValueChange={(value) => setSubjectForm({ ...subjectForm, yearLevel: value as "1" | "2" | "3" | "4" })}
+              >
+                <SelectTrigger data-testid="select-edit-year-level">
+                  <SelectValue placeholder="Select year level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1st Year</SelectItem>
+                  <SelectItem value="2">2nd Year</SelectItem>
+                  <SelectItem value="3">3rd Year</SelectItem>
+                  <SelectItem value="4">4th Year</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-center gap-2">
               <input
