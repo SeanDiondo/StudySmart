@@ -1156,7 +1156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/quizzes/generate", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { subjectId, difficulty, questionCount } = req.body;
+      const { subjectId, difficulty, questionCount, materialIds } = req.body;
 
       if (!subjectId || !difficulty || !questionCount) {
         return res.status(400).json({ message: "Missing required fields" });
@@ -1167,7 +1167,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Subject not found" });
       }
 
-      const materials = await storage.getStudyMaterials(subjectId);
+      let materials = await storage.getStudyMaterials(subjectId);
+
+      if (materialIds && Array.isArray(materialIds) && materialIds.length > 0) {
+        const requestedMaterialIds = new Set(materialIds);
+        materials = materials.filter(m => requestedMaterialIds.has(m.id));
+        
+        if (materials.length === 0) {
+          return res.status(400).json({ message: "No valid materials found for the selected IDs" });
+        }
+
+        const allBelongToSubject = materials.every(m => m.subjectId === subjectId);
+        if (!allBelongToSubject) {
+          return res.status(400).json({ message: "Some materials do not belong to the selected subject" });
+        }
+      }
+
+      if (materials.length === 0) {
+        return res.status(400).json({ message: "No study materials available for this subject" });
+      }
+
       const materialContext = materials.map(m => `${m.title}: ${m.description}`).join("\n");
 
       const quizData = await generateQuiz(subject.name, difficulty, questionCount, materialContext);

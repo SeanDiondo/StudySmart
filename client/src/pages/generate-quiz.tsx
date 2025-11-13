@@ -3,21 +3,24 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Brain, Sparkles } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Brain, Sparkles, BookOpen } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Subject } from "@shared/schema";
+import type { Subject, StudyMaterial } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { useState, useEffect } from "react";
 
 const quizGenerationSchema = z.object({
   subjectId: z.string().min(1, "Please select a subject"),
   difficulty: z.enum(["easy", "medium", "hard"]),
   questionCount: z.coerce.number().min(5, "Minimum 5 questions").max(20, "Maximum 20 questions"),
+  materialIds: z.array(z.string()).optional(),
 });
 
 type QuizGenerationForm = z.infer<typeof quizGenerationSchema>;
@@ -26,6 +29,7 @@ export default function GenerateQuiz() {
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const [selectedMaterials, setSelectedMaterials] = useState<string[]>([]);
 
   const { data: subjects } = useQuery<Subject[]>({
     queryKey: ["/api/subjects/for-student"],
@@ -38,12 +42,48 @@ export default function GenerateQuiz() {
       subjectId: "",
       difficulty: "medium",
       questionCount: 10,
+      materialIds: [],
     },
   });
 
+  const selectedSubjectId = form.watch("subjectId");
+
+  const { data: materials, isLoading: materialsLoading } = useQuery<StudyMaterial[]>({
+    queryKey: ["/api/study-materials", { subjectId: selectedSubjectId }],
+    enabled: !!selectedSubjectId && isAuthenticated,
+  });
+
+  useEffect(() => {
+    setSelectedMaterials([]);
+    form.setValue("materialIds", []);
+  }, [selectedSubjectId, form]);
+
+  const toggleMaterial = (materialId: string) => {
+    setSelectedMaterials((prev) => {
+      const newSelection = prev.includes(materialId)
+        ? prev.filter((id) => id !== materialId)
+        : [...prev, materialId];
+      form.setValue("materialIds", newSelection);
+      return newSelection;
+    });
+  };
+
+  const toggleAllMaterials = () => {
+    if (materials) {
+      const allIds = materials.map((m) => m.id);
+      const newSelection = selectedMaterials.length === materials.length ? [] : allIds;
+      setSelectedMaterials(newSelection);
+      form.setValue("materialIds", newSelection);
+    }
+  };
+
   const generateMutation = useMutation({
     mutationFn: async (data: QuizGenerationForm) => {
-      const res = await apiRequest("POST", "/api/quizzes/generate", data);
+      const payload = {
+        ...data,
+        materialIds: selectedMaterials.length > 0 ? selectedMaterials : undefined,
+      };
+      const res = await apiRequest("POST", "/api/quizzes/generate", payload);
       return await res.json();
     },
     onSuccess: () => {
@@ -115,6 +155,70 @@ export default function GenerateQuiz() {
                   </FormItem>
                 )}
               />
+
+              {selectedSubjectId && (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2">
+                    <BookOpen className="h-4 w-4" />
+                    Study Materials (Optional)
+                  </FormLabel>
+                  <FormDescription className="mb-3">
+                    Select specific materials to base quiz questions on, or leave empty to use all available materials
+                  </FormDescription>
+                  {materialsLoading ? (
+                    <div className="text-sm text-muted-foreground">Loading materials...</div>
+                  ) : materials && materials.length > 0 ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 pb-2 border-b">
+                        <Checkbox
+                          id="select-all"
+                          checked={selectedMaterials.length === materials.length && materials.length > 0}
+                          onCheckedChange={toggleAllMaterials}
+                          data-testid="checkbox-select-all-materials"
+                        />
+                        <label
+                          htmlFor="select-all"
+                          className="text-sm font-medium cursor-pointer"
+                        >
+                          Select All ({materials.length} materials)
+                        </label>
+                      </div>
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {materials.map((material) => (
+                          <div key={material.id} className="flex items-start gap-2 p-2 rounded-md hover-elevate">
+                            <Checkbox
+                              id={material.id}
+                              checked={selectedMaterials.includes(material.id)}
+                              onCheckedChange={() => toggleMaterial(material.id)}
+                              data-testid={`checkbox-material-${material.id}`}
+                            />
+                            <label
+                              htmlFor={material.id}
+                              className="text-sm cursor-pointer flex-1"
+                            >
+                              <div className="font-medium">{material.title}</div>
+                              {material.description && (
+                                <div className="text-muted-foreground text-xs mt-0.5">
+                                  {material.description}
+                                </div>
+                              )}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="text-xs text-muted-foreground pt-2">
+                        {selectedMaterials.length > 0
+                          ? `${selectedMaterials.length} material${selectedMaterials.length !== 1 ? 's' : ''} selected`
+                          : "No materials selected - will use all available materials"}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">
+                      No materials available for this subject
+                    </div>
+                  )}
+                </FormItem>
+              )}
 
               <FormField
                 control={form.control}
