@@ -2,7 +2,7 @@
 
 ## Overview
 
-CCIT Study Plan is an AI-powered educational platform designed for CCIT students. It provides personalized study planning, adaptive quiz generation, and intelligent performance analytics to enhance the learning experience. The system supports two primary user roles: Students, who create study plans, access materials, take quizzes, and track progress; and Administrators, who manage educational content. The project aims to provide an advanced, AI-driven learning platform with strong market potential in the education technology sector.
+CCIT Study Plan is an AI-powered educational platform designed for CCIT students. It provides personalized study planning, adaptive quiz generation, and intelligent performance analytics to enhance the learning experience. The system supports **multiple degree programs (BSIT, BSCS)** with program-specific filtering across all features. The system supports two primary user roles: Students, who create study plans, access materials, take quizzes, and track progress; and Administrators, who manage educational content including subject validation and program assignments. The project aims to provide an advanced, AI-driven learning platform with strong market potential in the education technology sector.
 
 ## User Preferences
 
@@ -20,7 +20,11 @@ The backend is built with Express.js and TypeScript, using Drizzle ORM for datab
 
 ### Database Schema
 
-The database uses Neon PostgreSQL and includes core tables such as `users`, `subjects`, `study_plans`, `study_plan_subjects`, `study_materials`, `quizzes`, `quiz_attempts`, and `sessions`. Key design decisions include PostgreSQL enums, UUID primary keys, timestamp fields, JSONB fields for flexible data, and foreign key relationships with cascading deletes.
+The database uses Neon PostgreSQL and includes core tables such as `users`, `subjects`, `study_plans`, `study_plan_subjects`, `study_materials`, `quizzes`, `quiz_attempts`, `sessions`, `programs`, and `subject_programs`. Key design decisions include PostgreSQL enums, UUID primary keys, timestamp fields, JSONB fields for flexible data, and foreign key relationships with cascading deletes.
+
+**Multi-Program Support**: The platform supports multiple degree programs (BSIT, BSCS) through the `programs` table and `subject_programs` join table. Each subject can be associated with one or more programs and year levels. Students are assigned to a program via `users.programId`. All exam and material filtering respects program boundaries to ensure students only see content relevant to their degree program.
+
+**Subject Validation System**: When administrators upload study materials, subject names are validated against the database. If a subject name is not recognized for the student's program/year level combination, the material is flagged as "pending" with the `rawSubjectName` stored for admin review. Admins can then map pending materials to existing subjects or create new subject entries. This ensures data integrity while allowing flexible content uploads.
 
 **Soft Delete Implementation**: Quizzes use soft delete (archiving) to preserve student performance data. The `quizzes` table has an `isArchived` boolean field (default: false). When a quiz is "deleted", it's archived (`isArchived = true`) instead of being permanently removed. This preserves all quiz attempts and performance analytics while hiding the quiz from student-facing lists. Archived quizzes can still be accessed for reporting and analytics purposes.
 
@@ -90,20 +94,23 @@ The platform includes an automated exam generation system that creates Pre-Tests
 **Phase 3 - Student Exam Dashboard & Admin Reports (Implemented):**
 
 -   **Student Dashboard Integration:**
-    -   Added "Available Exams" section displaying Pre-Tests and Post-Tests based on student's year level and study plan
+    -   Added "Available Exams" section displaying Pre-Tests and Post-Tests based on student's **program**, year level, and study plan
     -   Subject resolution: Active study plan → Irregular student assignments → Year-level defaults
+    -   **Program Filtering**: When student has programId assigned, exams are filtered to show only content for their degree program (graceful degradation for students without program assignment)
     -   Exam cards show: Title, subject, exam type badge, material type badge, attempt metadata (count + last attempt date)
     -   "Take Exam" or "Retake Exam" buttons linking to quiz interface
-    -   Backend endpoint: `GET /api/exams/available` with smart filtering by examType, yearLevel, and subjectIds
+    -   Backend endpoint: `GET /api/exams/available` with smart filtering by examType, yearLevel, subjectIds, and programId
     -   Updated quiz access: Students can now access pre_test/post_test quizzes regardless of creator
 
 -   **Admin Reports System:**
     -   New Reports page at `/admin/reports` with comprehensive exam analytics
     -   Overall statistics: Total exams, total attempts, unique students participated, average score
-    -   Advanced filtering: Search, year level, exam type (Pre-Test/Post-Test), material type (Midterm/Finals), subject
+    -   Advanced filtering: Search, **program** (BSIT/BSCS), year level, exam type (Pre-Test/Post-Test), material type (Midterm/Finals), subject
+    -   Server-side filtering via `GET /api/admin/exams/filtered` with efficient database joins on subjectPrograms table
     -   Statistics table displaying per-exam: Title, subject, type badges, attempt count, unique students, average score
     -   Color-coded scores: Green (≥70%), yellow (≥50%), red (<50%)
     -   Admin endpoints: `GET /api/admin/quizzes` and `GET /api/admin/quiz-attempts` for comprehensive data access
+    -   Memoized query URLs prevent unnecessary refetches while maintaining filter reactivity
 
 ## External Dependencies
 
