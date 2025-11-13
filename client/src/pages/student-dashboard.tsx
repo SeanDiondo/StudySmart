@@ -265,11 +265,6 @@ function StudyPlanCard({ plan, subjects, planNumber }: { plan: StudyPlan; subjec
     enabled: !!plan.id,
   });
 
-  const getSubjectName = (subjectId: string) => {
-    const subject = subjects?.find(s => s.id === subjectId);
-    return subject?.name || subjectId;
-  };
-
   const createdDate = new Date(plan.createdAt).toLocaleDateString('en-US', { 
     month: 'short', 
     day: 'numeric', 
@@ -306,8 +301,8 @@ function StudyPlanCard({ plan, subjects, planNumber }: { plan: StudyPlan; subjec
             <h4 className="font-medium text-sm text-muted-foreground">Subjects</h4>
             <div className="flex flex-wrap gap-2">
               {planSubjects.map((planSubject: any) => (
-                <Badge key={planSubject.id} variant="outline" className="text-xs">
-                  {getSubjectName(planSubject.subjectId)}
+                <Badge key={planSubject.id} variant="outline" className="text-xs" data-testid={`subject-badge-${planSubject.id}`}>
+                  {planSubject.subject?.name || planSubject.subjectId}
                   {planSubject.priority && ` (Priority: ${planSubject.priority})`}
                 </Badge>
               ))}
