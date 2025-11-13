@@ -1070,59 +1070,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`✓ Generated Pre-Test and Post-Test for ${subject.name} (${materialType})`);
       
-      // Send email notifications to eligible students
-      try {
-        console.log(`📧 Sending exam availability notifications to eligible students...`);
-        
-        // Get all student users
-        const allUsers = await storage.getAllUsers();
-        const students = allUsers.filter(u => u.role === "student" && u.email);
-        
-        // Filter students who are eligible for this subject
-        let eligibleStudents = students;
-        
-        // Filter by year level if subject has one
-        if (subject.yearLevel) {
-          eligibleStudents = eligibleStudents.filter(s => s.yearLevel === subject.yearLevel);
-        }
-        
-        // Filter by program if subject has program assignments
-        const allSubjectPrograms = await storage.getSubjectProgramMappings();
-        const subjectPrograms = allSubjectPrograms.filter(sp => sp.subjectId === subjectId);
-        if (subjectPrograms.length > 0) {
-          const programIds = new Set(subjectPrograms.map((sp: { subjectId: string; programId: string }) => sp.programId));
-          eligibleStudents = eligibleStudents.filter(s => s.programId && programIds.has(s.programId));
-        }
-        
-        console.log(`📧 Found ${eligibleStudents.length} eligible students for notifications`);
-        
-        // Send notifications to all eligible students
-        const { sendExamAvailabilityNotification } = await import('./email');
-        let successCount = 0;
-        let failCount = 0;
-        
-        for (const student of eligibleStudents) {
-          try {
-            await sendExamAvailabilityNotification({
+      // Send email notifications to eligible students (async, non-blocking)
+      // This runs in the background and doesn't block the response
+      (async () => {
+        try {
+          // Guard: Ensure storage methods are available
+          if (!storage || !storage.getAllUsers || !storage.getSubjectProgramMappings) {
+            console.error('⚠️ Storage not properly initialized for email notifications');
+            return;
+          }
+          console.log(`📧 Sending exam availability notifications to eligible students...`);
+          
+          // Get all student users
+          const allUsers = await storage.getAllUsers();
+          const students = allUsers.filter(u => u.role === "student" && u.email);
+          
+          // Filter students who are eligible for this subject
+          let eligibleStudents = students;
+          
+          // Filter by year level if subject has one
+          if (subject.yearLevel) {
+            eligibleStudents = eligibleStudents.filter(s => s.yearLevel === subject.yearLevel);
+          }
+          
+          // Filter by program if subject has program assignments
+          const allSubjectPrograms = await storage.getSubjectProgramMappings();
+          const subjectPrograms = allSubjectPrograms.filter(sp => sp.subjectId === subjectId);
+          if (subjectPrograms.length > 0) {
+            const programIds = new Set(subjectPrograms.map((sp: { subjectId: string; programId: string }) => sp.programId));
+            eligibleStudents = eligibleStudents.filter(s => s.programId && programIds.has(s.programId));
+          }
+          
+          console.log(`📧 Found ${eligibleStudents.length} eligible students for notifications`);
+          
+          // Send notifications in parallel (non-blocking)
+          const { sendExamAvailabilityNotification } = await import('./email');
+          const notificationPromises = eligibleStudents.map(student =>
+            sendExamAvailabilityNotification({
               recipientEmail: student.email!,
               recipientName: student.firstName || 'Student',
               subjectName: subject.name,
               subjectCode: subject.description?.match(/\((.*?)\)/)?.[1],
               yearLevel: subject.yearLevel || '1',
               materialType: materialType as "midterm" | "finals",
-            });
-            successCount++;
-          } catch (emailError) {
-            console.error(`Failed to send notification to ${student.email}:`, emailError);
-            failCount++;
-          }
+            }).catch(error => {
+              console.error(`Failed to send notification to ${student.email}:`, error);
+              return null; // Return null for failed sends
+            })
+          );
+          
+          // Send all notifications in parallel
+          const results = await Promise.allSettled(notificationPromises);
+          const successCount = results.filter(r => r.status === 'fulfilled' && r.value !== null).length;
+          const failCount = results.length - successCount;
+          
+          console.log(`✓ Exam availability notifications sent: ${successCount} successful, ${failCount} failed`);
+        } catch (notificationError) {
+          // Don't fail the entire request if notifications fail
+          console.error(`⚠️ Error sending exam availability notifications:`, notificationError);
         }
-        
-        console.log(`✓ Exam availability notifications sent: ${successCount} successful, ${failCount} failed`);
-      } catch (notificationError) {
-        // Don't fail the entire request if notifications fail
-        console.error(`⚠️ Error sending exam availability notifications:`, notificationError);
-      }
+      })().catch(err => {
+        // Catch any uncaught rejections from the async IIFE
+        console.error('⚠️ Uncaught error in notification background task:', err);
+      });
       
       res.json(materialSet);
     } catch (error: any) {
@@ -1470,6 +1480,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error generating insights:", error);
       res.status(500).json({ message: "Failed to generate insights" });
+    }
+  });
+
+  // Exam performance analytics (Pre-Test and Post-Test breakdown)
+  app.get("/api/analytics/exam-performance", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Get all quiz attempts for the user
+      const attempts = await storage.getQuizAttempts(userId);
+      
+      // Get all quizzes to map exam types
+      const quizzes = await storage.getQuizzes();
+      const quizMap = new Map(quizzes.map(q => [q.id, q]));
+      
+      // Get all subjects for names
+      const subjects = await storage.getSubjects();
+      const subjectMap = new Map(subjects.map(s => [s.id, s]));
+      
+      // Group attempts by subject and exam type
+      const performanceBySubject = new Map<string, {
+        subjectId: string;
+        subjectName: string;
+        preTestScores: number[];
+        postTestScores: number[];
+        preTestAttempts: number;
+        postTestAttempts: number;
+      }>();
+      
+      for (const attempt of attempts) {
+        const quiz = quizMap.get(attempt.quizId);
+        if (!quiz || quiz.examType === 'quiz') continue; // Skip regular quizzes
+        
+        const subject = subjectMap.get(quiz.subjectId);
+        if (!subject) continue;
+        
+        const key = quiz.subjectId;
+        if (!performanceBySubject.has(key)) {
+          performanceBySubject.set(key, {
+            subjectId: quiz.subjectId,
+            subjectName: subject.name,
+            preTestScores: [],
+            postTestScores: [],
+            preTestAttempts: 0,
+            postTestAttempts: 0,
+          });
+        }
+        
+        const data = performanceBySubject.get(key)!;
+        if (quiz.examType === 'pre_test') {
+          data.preTestScores.push(attempt.score);
+          data.preTestAttempts++;
+        } else if (quiz.examType === 'post_test') {
+          data.postTestScores.push(attempt.score);
+          data.postTestAttempts++;
+        }
+      }
+      
+      // Calculate averages and improvement
+      const examPerformance = Array.from(performanceBySubject.values()).map(data => {
+        const preTestAvg = data.preTestScores.length > 0
+          ? Math.round(data.preTestScores.reduce((sum, s) => sum + s, 0) / data.preTestScores.length)
+          : null;
+        const postTestAvg = data.postTestScores.length > 0
+          ? Math.round(data.postTestScores.reduce((sum, s) => sum + s, 0) / data.postTestScores.length)
+          : null;
+        const improvement = (preTestAvg !== null && postTestAvg !== null)
+          ? postTestAvg - preTestAvg
+          : null;
+        
+        return {
+          subjectId: data.subjectId,
+          subjectName: data.subjectName,
+          preTestAvg,
+          postTestAvg,
+          improvement,
+          preTestAttempts: data.preTestAttempts,
+          postTestAttempts: data.postTestAttempts,
+        };
+      });
+      
+      // Calculate overall summary
+      const allPreTestScores = examPerformance
+        .filter(e => e.preTestAvg !== null)
+        .map(e => e.preTestAvg!);
+      const allPostTestScores = examPerformance
+        .filter(e => e.postTestAvg !== null)
+        .map(e => e.postTestAvg!);
+      
+      const overallPreTestAvg = allPreTestScores.length > 0
+        ? Math.round(allPreTestScores.reduce((sum, s) => sum + s, 0) / allPreTestScores.length)
+        : null;
+      const overallPostTestAvg = allPostTestScores.length > 0
+        ? Math.round(allPostTestScores.reduce((sum, s) => sum + s, 0) / allPostTestScores.length)
+        : null;
+      const overallImprovement = (overallPreTestAvg !== null && overallPostTestAvg !== null)
+        ? overallPostTestAvg - overallPreTestAvg
+        : null;
+      
+      res.json({
+        summary: {
+          preTestAvg: overallPreTestAvg,
+          postTestAvg: overallPostTestAvg,
+          improvement: overallImprovement,
+          totalPreTests: allPreTestScores.length,
+          totalPostTests: allPostTestScores.length,
+        },
+        bySubject: examPerformance,
+      });
+    } catch (error) {
+      console.error("Error fetching exam performance:", error);
+      res.status(500).json({ message: "Failed to fetch exam performance" });
     }
   });
 
