@@ -5,6 +5,7 @@ import {
   studyPlans,
   studyPlanSubjects,
   studyMaterials,
+  materialSets,
   quizzes,
   quizAttempts,
   studentSubjectAssignments,
@@ -18,6 +19,8 @@ import {
   type InsertStudyPlanSubject,
   type StudyMaterial,
   type InsertStudyMaterial,
+  type MaterialSet,
+  type InsertMaterialSet,
   type Quiz,
   type InsertQuiz,
   type QuizAttempt,
@@ -70,11 +73,16 @@ export interface IStorage {
   deleteStudyPlanSubjectsByPlanId(planId: string): Promise<void>;
   
   // Study Materials operations
-  getStudyMaterials(subjectId?: string): Promise<StudyMaterial[]>;
+  getStudyMaterials(subjectId?: string, materialType?: "midterm" | "finals"): Promise<StudyMaterial[]>;
   getStudyMaterial(id: string): Promise<StudyMaterial | undefined>;
   createStudyMaterial(material: InsertStudyMaterial): Promise<StudyMaterial>;
   updateStudyMaterial(id: string, material: Partial<InsertStudyMaterial>): Promise<StudyMaterial>;
   deleteStudyMaterial(id: string): Promise<void>;
+  
+  // Material Set operations (Phase 1: Admin completion workflow)
+  getMaterialSet(subjectId: string, materialType: "midterm" | "finals"): Promise<MaterialSet | undefined>;
+  upsertMaterialSet(materialSetData: InsertMaterialSet): Promise<MaterialSet>;
+  markMaterialSetCompleted(params: {subjectId: string, materialType: "midterm" | "finals", completedBy: string, preTestQuizId?: string, postTestQuizId?: string}): Promise<MaterialSet>;
   
   // Quiz operations
   getQuizzes(userId?: string, subjectId?: string): Promise<Quiz[]>;
@@ -331,9 +339,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Study Materials operations
-  async getStudyMaterials(subjectId?: string): Promise<StudyMaterial[]> {
-    if (subjectId) {
-      return await db.select().from(studyMaterials).where(eq(studyMaterials.subjectId, subjectId));
+  async getStudyMaterials(subjectId?: string, materialType?: "midterm" | "finals"): Promise<StudyMaterial[]> {
+    let conditions = [];
+    if (subjectId) conditions.push(eq(studyMaterials.subjectId, subjectId));
+    if (materialType) conditions.push(eq(studyMaterials.materialType, materialType));
+    
+    if (conditions.length > 0) {
+      return await db.select().from(studyMaterials).where(and(...conditions));
     }
     return await db.select().from(studyMaterials);
   }
@@ -359,6 +371,78 @@ export class DatabaseStorage implements IStorage {
 
   async deleteStudyMaterial(id: string): Promise<void> {
     await db.delete(studyMaterials).where(eq(studyMaterials.id, id));
+  }
+
+  // Material Set operations (Phase 1: Admin completion workflow)
+  async getMaterialSet(subjectId: string, materialType: "midterm" | "finals"): Promise<MaterialSet | undefined> {
+    const [materialSet] = await db
+      .select()
+      .from(materialSets)
+      .where(and(
+        eq(materialSets.subjectId, subjectId),
+        eq(materialSets.materialType, materialType)
+      ));
+    return materialSet || undefined;
+  }
+
+  async upsertMaterialSet(materialSetData: InsertMaterialSet): Promise<MaterialSet> {
+    const [materialSet] = await db
+      .insert(materialSets)
+      .values(materialSetData)
+      .onConflictDoUpdate({
+        target: [materialSets.subjectId, materialSets.materialType],
+        set: {
+          isCompleted: materialSetData.isCompleted ?? false,
+          completedBy: materialSetData.completedBy,
+          completedAt: materialSetData.isCompleted ? sql`NOW()` : null,
+        },
+      })
+      .returning();
+    return materialSet;
+  }
+
+  async markMaterialSetCompleted(params: {
+    subjectId: string;
+    materialType: "midterm" | "finals";
+    completedBy: string;
+    preTestQuizId?: string;
+    postTestQuizId?: string;
+  }): Promise<MaterialSet> {
+    const updateData: any = {
+      isCompleted: true,
+      completedBy: params.completedBy,
+      completedAt: sql`NOW()`,
+    };
+    
+    if (params.preTestQuizId) updateData.preTestQuizId = params.preTestQuizId;
+    if (params.postTestQuizId) updateData.postTestQuizId = params.postTestQuizId;
+
+    const [materialSet] = await db
+      .update(materialSets)
+      .set(updateData)
+      .where(and(
+        eq(materialSets.subjectId, params.subjectId),
+        eq(materialSets.materialType, params.materialType)
+      ))
+      .returning();
+    
+    if (!materialSet) {
+      const [newSet] = await db
+        .insert(materialSets)
+        .values({
+          subjectId: params.subjectId,
+          materialType: params.materialType,
+          isCompleted: true,
+          completedBy: params.completedBy,
+          completedAt: sql`NOW()`,
+          preTestQuizId: params.preTestQuizId,
+          postTestQuizId: params.postTestQuizId,
+        })
+        .returning();
+      return newSet;
+    }
+    
+    return materialSet;
   }
 
   // Quiz operations

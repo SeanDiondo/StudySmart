@@ -1,0 +1,60 @@
+System Feature Description – Study Materials, AI-Generated Exams, and Reports
+🎓 Admin Side
+
+When the admin uploads learning materials, there should be an option to select whether the materials are for Midterm or Finals.
+
+Example: When uploading, there’s a dropdown menu or toggle labeled “Material Type” with options:
+
+🟦 Midterm
+
+🟨 Final
+
+Once the admin completes uploading all the materials for either Midterm or Finals, there should be a button or trigger page where the admin can mark that set as “Completed.”
+
+Example: A button labeled “Mark Midterm Materials as Completed” or “Mark Final Materials as Completed.”
+
+📚 Student Dashboard
+
+Once the admin marks the materials as completed, the system will automatically generate AI-based Pre-Test and Post-Test exams for the related materials.
+
+For example, if the Midterm materials include Chapter 1 to Chapter 5, the AI will generate:
+
+A Pre-Test covering Chapter 1–5 (before studying the materials)
+
+A Post-Test covering the same chapters (after studying)
+
+The students will then see a notification or section on their dashboard such as:
+
+“Midterm Pre-Test and Post-Test are now available.”
+
+The same process applies for Finals materials.
+
+📊 Reports Page (Admin View)
+
+There should be a Reports Page where the admin can view all the students’ test results and activities, including:
+
+Quizzes
+
+Pre-Tests
+
+Post-Tests
+
+This report should include filters to easily sort or view data such as:
+
+Year Level: (e.g., First Year, Second Year, Third Year, Fourth Year)
+
+Exam Type: (Quiz, Pre-Test, Post-Test)
+
+Subject or Term: (Midterm, Final)
+
+So the admin can, for example, filter to show:
+
+“All Fourth Year students who have completed the Midterm Post-Test for English.”
+
+🧠 Summary of System Flow
+Step	Action	Result
+1️⃣	Admin uploads materials	Selects whether Midterm or Final
+2️⃣	Admin marks materials as Completed	System confirms that term is ready
+3️⃣	System triggers AI exam generation	Creates Pre-Test and Post-Test based on uploaded chapters
+4️⃣	Students see exams on dashboard	Can take Pre and Post Tests for that subject
+5️⃣	Admin views Reports page	Can filter by Year, Subject, and Exam Type

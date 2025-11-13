@@ -8,6 +8,8 @@ export const userRoleEnum = pgEnum("user_role", ["student", "admin"]);
 export const difficultyEnum = pgEnum("difficulty", ["easy", "medium", "hard"]);
 export const dayOfWeekEnum = pgEnum("day_of_week", ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]);
 export const yearLevelEnum = pgEnum("year_level", ["1", "2", "3", "4"]);
+export const materialTypeEnum = pgEnum("material_type", ["midterm", "finals"]);
+export const examTypeEnum = pgEnum("exam_type", ["quiz", "pre_test", "post_test"]);
 
 // Session storage table (required for Replit Auth)
 export const sessions = pgTable(
@@ -133,6 +135,7 @@ export const studyMaterials = pgTable("study_materials", {
   fileUrl: text("file_url").notNull(),
   fileName: text("file_name").notNull(),
   fileSize: integer("file_size").notNull(), // in bytes
+  materialType: materialTypeEnum("material_type").notNull().default("midterm"), // midterm or finals
   uploadedBy: varchar("uploaded_by").notNull().references(() => users.id),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
 });
@@ -145,6 +148,30 @@ export const insertStudyMaterialSchema = createInsertSchema(studyMaterials).omit
 export type InsertStudyMaterial = z.infer<typeof insertStudyMaterialSchema>;
 export type StudyMaterial = typeof studyMaterials.$inferSelect;
 
+// Material Sets Completion tracking (for Pre-Test and Post-Test generation)
+export const materialSets = pgTable("material_sets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  subjectId: varchar("subject_id").notNull().references(() => subjects.id, { onDelete: "cascade" }),
+  materialType: materialTypeEnum("material_type").notNull(), // midterm or finals
+  isCompleted: boolean("is_completed").notNull().default(false),
+  completedBy: varchar("completed_by").references(() => users.id), // Admin who marked as complete
+  completedAt: timestamp("completed_at"),
+  preTestQuizId: varchar("pre_test_quiz_id").references(() => quizzes.id, { onDelete: "set null" }), // FK to generated pre-test
+  postTestQuizId: varchar("post_test_quiz_id").references(() => quizzes.id, { onDelete: "set null" }), // FK to generated post-test
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("unique_subject_material_type").on(table.subjectId, table.materialType),
+]);
+
+export const insertMaterialSetSchema = createInsertSchema(materialSets).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+
+export type InsertMaterialSet = z.infer<typeof insertMaterialSetSchema>;
+export type MaterialSet = typeof materialSets.$inferSelect;
+
 // Quizzes table (AI-generated quizzes)
 export const quizzes = pgTable("quizzes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -152,6 +179,8 @@ export const quizzes = pgTable("quizzes", {
   subjectId: varchar("subject_id").notNull().references(() => subjects.id),
   title: text("title").notNull(),
   difficulty: difficultyEnum("difficulty").notNull().default("medium"),
+  examType: examTypeEnum("exam_type").notNull().default("quiz"), // quiz, pre_test, post_test
+  materialType: materialTypeEnum("material_type"), // null for regular quizzes, set for pre/post tests
   questions: json("questions").$type<{questionText: string, options: string[], correctAnswer: string, explanation: string}[]>().notNull(),
   isArchived: boolean("is_archived").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
