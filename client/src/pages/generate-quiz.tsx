@@ -10,7 +10,7 @@ import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { SelectSubject } from "@shared/schema";
+import type { Subject } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
@@ -27,7 +27,7 @@ export default function GenerateQuiz() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
-  const { data: subjects } = useQuery<SelectSubject[]>({
+  const { data: subjects } = useQuery<Subject[]>({
     queryKey: ["/api/subjects/for-student"],
     enabled: isAuthenticated,
   });
@@ -94,20 +94,20 @@ export default function GenerateQuiz() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Subject</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
+                    <FormControl>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
                         <SelectTrigger data-testid="select-subject">
                           <SelectValue placeholder="Select a subject" />
                         </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {subjects?.map((subject) => (
-                          <SelectItem key={subject.id} value={subject.id}>
-                            {subject.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                        <SelectContent>
+                          {subjects?.map((subject) => (
+                            <SelectItem key={subject.id} value={subject.id}>
+                              {subject.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
                     <FormDescription>
                       Quiz questions will be generated from this subject's study materials
                     </FormDescription>
@@ -122,18 +122,18 @@ export default function GenerateQuiz() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Difficulty Level</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
+                    <FormControl>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <SelectTrigger data-testid="select-difficulty">
                           <SelectValue />
                         </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="easy">Easy</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="hard">Hard</SelectItem>
-                      </SelectContent>
-                    </Select>
+                        <SelectContent>
+                          <SelectItem value="easy">Easy</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="hard">Hard</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
                     <FormDescription>
                       Adjust the complexity of generated questions
                     </FormDescription>
