@@ -8,16 +8,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Search, Users as UsersIcon, Shield, User as UserIcon, Pencil, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Search, Users as UsersIcon, Shield, User as UserIcon, Pencil, Trash2, BookOpen, X } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import type { User } from "@shared/schema";
+import type { User, Subject } from "@shared/schema";
 
 export default function AdminUsers() {
   const [searchQuery, setSearchQuery] = useState("");
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [managingSubjectsUserId, setManagingSubjectsUserId] = useState<string | null>(null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>("");
   const [editFormData, setEditFormData] = useState({
     firstName: "",
     lastName: "",
@@ -29,6 +32,16 @@ export default function AdminUsers() {
   const { data: users, isLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
     enabled: isAuthenticated,
+  });
+
+  const { data: allSubjects } = useQuery<Subject[]>({
+    queryKey: ["/api/subjects"],
+    enabled: isAuthenticated,
+  });
+
+  const { data: studentAssignments, refetch: refetchAssignments } = useQuery<{ subject: Subject }[]>({
+    queryKey: ["/api/admin/students", managingSubjectsUserId, "assignments"],
+    enabled: isAuthenticated && !!managingSubjectsUserId,
   });
 
   const updateRoleMutation = useMutation({
@@ -74,6 +87,72 @@ export default function AdminUsers() {
     },
   });
 
+  const updateStudentStatusMutation = useMutation({
+    mutationFn: async ({ userId, yearLevel, isRegular }: { userId: string; yearLevel: string; isRegular: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/admin/users/${userId}/student-status`, { yearLevel, isRegular });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({
+        title: "Success!",
+        description: "Student status updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update student status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const assignSubjectMutation = useMutation({
+    mutationFn: async ({ studentId, subjectId }: { studentId: string; subjectId: string }) => {
+      const res = await apiRequest("POST", `/api/admin/students/${studentId}/subjects`, { subjectId });
+      return await res.json();
+    },
+    onSuccess: () => {
+      refetchAssignments();
+      queryClient.invalidateQueries({ queryKey: ["/api/subjects/for-student"] });
+      setSelectedSubjectId("");
+      toast({
+        title: "Success!",
+        description: "Subject assigned successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to assign subject",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const removeSubjectMutation = useMutation({
+    mutationFn: async ({ studentId, subjectId }: { studentId: string; subjectId: string }) => {
+      const res = await apiRequest("DELETE", `/api/admin/students/${studentId}/subjects/${subjectId}`);
+      return await res.json();
+    },
+    onSuccess: () => {
+      refetchAssignments();
+      queryClient.invalidateQueries({ queryKey: ["/api/subjects/for-student"] });
+      toast({
+        title: "Success!",
+        description: "Subject removed successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove subject",
+        variant: "destructive",
+      });
+    },
+  });
+
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
       const res = await apiRequest("DELETE", `/api/admin/users/${userId}`);
@@ -98,6 +177,14 @@ export default function AdminUsers() {
 
   const handleRoleChange = (userId: string, newRole: "student" | "admin") => {
     updateRoleMutation.mutate({ userId, role: newRole });
+  };
+
+  const handleYearLevelChange = (userId: string, newYearLevel: string, currentIsRegular: boolean) => {
+    updateStudentStatusMutation.mutate({ userId, yearLevel: newYearLevel, isRegular: currentIsRegular });
+  };
+
+  const handleStudentStatusChange = (userId: string, newIsRegular: boolean, currentYearLevel: string) => {
+    updateStudentStatusMutation.mutate({ userId, yearLevel: currentYearLevel, isRegular: newIsRegular });
   };
 
   const handleEditClick = (user: User) => {
@@ -125,6 +212,24 @@ export default function AdminUsers() {
     if (!deletingUserId) return;
     deleteUserMutation.mutate(deletingUserId);
   };
+
+  const handleManageSubjectsClick = (userId: string) => {
+    setManagingSubjectsUserId(userId);
+  };
+
+  const handleAssignSubject = () => {
+    if (!managingSubjectsUserId || !selectedSubjectId) return;
+    assignSubjectMutation.mutate({ studentId: managingSubjectsUserId, subjectId: selectedSubjectId });
+  };
+
+  const handleRemoveSubject = (subjectId: string) => {
+    if (!managingSubjectsUserId) return;
+    removeSubjectMutation.mutate({ studentId: managingSubjectsUserId, subjectId });
+  };
+
+  const managingUser = users?.find(u => u.id === managingSubjectsUserId);
+  const assignedSubjectIds = new Set(studentAssignments?.map(a => a.subject.id) || []);
+  const availableSubjects = allSubjects?.filter(s => !assignedSubjectIds.has(s.id)) || [];
 
   const filteredUsers = (users || []).filter(
     (user) =>
@@ -174,12 +279,14 @@ export default function AdminUsers() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[200px]">Name</TableHead>
-                    <TableHead className="w-[250px]">Email</TableHead>
-                    <TableHead className="w-[120px]">Role</TableHead>
-                    <TableHead className="w-[120px]">Joined</TableHead>
-                    <TableHead className="w-[150px]">Change Role</TableHead>
-                    <TableHead className="w-[120px] text-right">Actions</TableHead>
+                    <TableHead className="w-[180px]">Name</TableHead>
+                    <TableHead className="w-[220px]">Email</TableHead>
+                    <TableHead className="w-[100px]">Role</TableHead>
+                    <TableHead className="w-[120px]">Year Level</TableHead>
+                    <TableHead className="w-[130px]">Status</TableHead>
+                    <TableHead className="w-[110px]">Joined</TableHead>
+                    <TableHead className="w-[120px]">Change Role</TableHead>
+                    <TableHead className="w-[100px] text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -203,6 +310,46 @@ export default function AdminUsers() {
                           </span>
                         </div>
                       </TableCell>
+                      <TableCell>
+                        {user.role === "student" ? (
+                          <Select
+                            value={user.yearLevel || "1"}
+                            onValueChange={(value) => handleYearLevelChange(user.id, value, user.isRegular ?? true)}
+                            disabled={updateStudentStatusMutation.isPending}
+                          >
+                            <SelectTrigger className="w-[100px]" data-testid={`select-year-${user.id}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">Year 1</SelectItem>
+                              <SelectItem value="2">Year 2</SelectItem>
+                              <SelectItem value="3">Year 3</SelectItem>
+                              <SelectItem value="4">Year 4</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">N/A</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {user.role === "student" ? (
+                          <Select
+                            value={user.isRegular ? "regular" : "irregular"}
+                            onValueChange={(value) => handleStudentStatusChange(user.id, value === "regular", user.yearLevel || "1")}
+                            disabled={updateStudentStatusMutation.isPending}
+                          >
+                            <SelectTrigger className="w-[120px]" data-testid={`select-status-${user.id}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="regular">Regular</SelectItem>
+                              <SelectItem value="irregular">Irregular</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">N/A</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {new Date(user.createdAt).toLocaleDateString()}
                       </TableCell>
@@ -212,7 +359,7 @@ export default function AdminUsers() {
                           onValueChange={(value) => handleRoleChange(user.id, value as "student" | "admin")}
                           disabled={updateRoleMutation.isPending}
                         >
-                          <SelectTrigger className="w-[130px]" data-testid={`select-role-${user.id}`}>
+                          <SelectTrigger className="w-[110px]" data-testid={`select-role-${user.id}`}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -223,6 +370,17 @@ export default function AdminUsers() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
+                          {user.role === "student" && !user.isRegular && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleManageSubjectsClick(user.id)}
+                              data-testid={`button-manage-subjects-${user.id}`}
+                              title="Manage Subjects"
+                            >
+                              <BookOpen className="h-4 w-4 text-primary" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
@@ -322,6 +480,90 @@ export default function AdminUsers() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Manage Subjects Dialog */}
+      <Dialog open={!!managingSubjectsUserId} onOpenChange={(open) => !open && setManagingSubjectsUserId(null)}>
+        <DialogContent className="max-w-2xl" data-testid="dialog-manage-subjects">
+          <DialogHeader>
+            <DialogTitle>Manage Subjects</DialogTitle>
+            <DialogDescription>
+              Assign subjects to {managingUser?.firstName || managingUser?.email?.split("@")[0] || "student"} (Irregular Student)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            <div className="space-y-4">
+              <Label>Assigned Subjects</Label>
+              {studentAssignments && studentAssignments.length > 0 ? (
+                <div className="space-y-2">
+                  {studentAssignments.map((assignment) => (
+                    <div
+                      key={assignment.subject.id}
+                      className="flex items-center justify-between p-3 rounded-md border"
+                      data-testid={`assigned-subject-${assignment.subject.id}`}
+                    >
+                      <div>
+                        <p className="font-medium">{assignment.subject.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {assignment.subject.description || `Year ${assignment.subject.yearLevel}`}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveSubject(assignment.subject.id)}
+                        disabled={removeSubjectMutation.isPending}
+                        data-testid={`button-remove-subject-${assignment.subject.id}`}
+                      >
+                        <X className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground py-4 text-center">
+                  No subjects assigned yet
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <Label>Assign New Subject</Label>
+              <div className="flex gap-2">
+                <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId}>
+                  <SelectTrigger className="flex-1" data-testid="select-assign-subject">
+                    <SelectValue placeholder="Select a subject..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableSubjects.length > 0 ? (
+                      availableSubjects.map((subject) => (
+                        <SelectItem key={subject.id} value={subject.id}>
+                          {subject.description || subject.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="none" disabled>
+                        No subjects available
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+                <Button
+                  onClick={handleAssignSubject}
+                  disabled={!selectedSubjectId || assignSubjectMutation.isPending}
+                  data-testid="button-assign-subject"
+                >
+                  {assignSubjectMutation.isPending ? "Assigning..." : "Assign"}
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setManagingSubjectsUserId(null)} data-testid="button-close-manage-subjects">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

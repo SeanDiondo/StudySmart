@@ -28,7 +28,7 @@ export default function GenerateQuiz() {
   const [, setLocation] = useLocation();
 
   const { data: subjects } = useQuery<SelectSubject[]>({
-    queryKey: ["/api/subjects"],
+    queryKey: ["/api/subjects/for-student"],
     enabled: isAuthenticated,
   });
 

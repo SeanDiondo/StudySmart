@@ -29,7 +29,7 @@ export default function MaterialsLibrary() {
 
   // Fetch subjects for filtering
   const { data: subjects } = useQuery<Subject[]>({
-    queryKey: ["/api/subjects"],
+    queryKey: ["/api/subjects/for-student"],
     enabled: isAuthenticated,
   });
 

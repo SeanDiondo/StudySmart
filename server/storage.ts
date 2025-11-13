@@ -218,10 +218,20 @@ export class DatabaseStorage implements IStorage {
 
   // Student Subject Assignment operations
   async getStudentAssignments(studentId: string): Promise<StudentSubjectAssignment[]> {
-    return await db
-      .select()
+    const assignments = await db
+      .select({
+        id: studentSubjectAssignments.id,
+        studentId: studentSubjectAssignments.studentId,
+        subjectId: studentSubjectAssignments.subjectId,
+        assignedBy: studentSubjectAssignments.assignedBy,
+        assignedAt: studentSubjectAssignments.assignedAt,
+        subject: subjects,
+      })
       .from(studentSubjectAssignments)
+      .innerJoin(subjects, eq(studentSubjectAssignments.subjectId, subjects.id))
       .where(eq(studentSubjectAssignments.studentId, studentId));
+    
+    return assignments as any; // Type assertion needed due to JOIN
   }
 
   async assignSubjectToStudent(assignment: InsertStudentSubjectAssignment): Promise<StudentSubjectAssignment> {

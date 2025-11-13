@@ -354,6 +354,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get filtered subjects for the current student (year-level or assigned)
+  app.get("/api/subjects/for-student", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const subjects = await storage.getSubjectsForStudent(userId);
+      res.json(subjects);
+    } catch (error) {
+      console.error("Error fetching subjects for student:", error);
+      res.status(500).json({ message: "Failed to fetch subjects" });
+    }
+  });
+
   app.get("/api/subjects/:id", isAuthenticated, async (req, res) => {
     try {
       const subject = await storage.getSubject(req.params.id);
