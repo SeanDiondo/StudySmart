@@ -1,11 +1,13 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Brain, Clock, FileQuestion, Plus } from "lucide-react";
+import { Brain, Clock, FileQuestion, Plus, Trash2 } from "lucide-react";
 import { Link } from "wouter";
 import { EmptyState } from "@/components/empty-state";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { SelectQuiz, SelectSubject } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -13,6 +15,7 @@ type QuizWithSubject = SelectQuiz & { subject?: Pick<SelectSubject, "name"> };
 
 export default function AvailableQuizzes() {
   const { isAuthenticated } = useAuth();
+  const { toast } = useToast();
 
   const { data: quizzes, isLoading } = useQuery<QuizWithSubject[]>({
     queryKey: ["/api/quizzes"],
@@ -23,6 +26,33 @@ export default function AvailableQuizzes() {
     queryKey: ["/api/subjects"],
     enabled: isAuthenticated,
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (quizId: string) => {
+      await apiRequest("DELETE", `/api/quizzes/${quizId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quizzes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/quiz-attempts"] });
+      toast({
+        title: "Success!",
+        description: "Quiz deleted successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete quiz",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDelete = (quizId: string, quizTitle: string) => {
+    if (confirm(`Are you sure you want to delete "${quizTitle}"? This action cannot be undone.`)) {
+      deleteMutation.mutate(quizId);
+    }
+  };
 
   const quizzesWithSubjects = quizzes?.map(quiz => {
     const subject = subjects?.find(s => s.id === quiz.subjectId);
@@ -122,11 +152,24 @@ export default function AvailableQuizzes() {
                     </div>
                   </div>
 
-                  <Link href={`/quiz/${quiz.id}`}>
-                    <Button className="w-full" data-testid={`button-start-quiz-${quiz.id}`}>
-                      Start Quiz
-                    </Button>
-                  </Link>
+                  <div className="flex gap-2">
+                    <Link href={`/quiz/${quiz.id}`} className="flex-1">
+                      <Button className="w-full" data-testid={`button-start-quiz-${quiz.id}`}>
+                        Start Quiz
+                      </Button>
+                    </Link>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => handleDelete(quiz.id, quiz.title)}
+                    disabled={deleteMutation.isPending}
+                    data-testid={`button-delete-quiz-${quiz.id}`}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Quiz
+                  </Button>
                 </div>
               </CardContent>
             </Card>

@@ -209,7 +209,7 @@ export default function CreateStudyPlan() {
     const totalHours = calculateTotalHours();
 
     const planData = {
-      hoursPerWeek: totalHours,
+      hoursPerWeek: Math.round(totalHours),
       learningGoals: learningGoals || "Personal development and skill improvement",
       availableDays: uniqueDays,
       availableTimeSlots: availableTimeSlots,

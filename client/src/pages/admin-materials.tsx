@@ -163,20 +163,22 @@ export default function AdminMaterials() {
       }
       
       // Validate required fields before submitting
-      if (!uploadForm.title || !uploadForm.subjectId) {
+      if (!uploadForm.title?.trim() || !uploadForm.subjectId?.trim()) {
+        const missingFields = [];
+        if (!uploadForm.title?.trim()) missingFields.push("title");
+        if (!uploadForm.subjectId?.trim()) missingFields.push("subject");
+        
         toast({
           title: "Missing Information",
-          description: "Please fill in the title and select a subject before uploading",
+          description: `Please fill in the ${missingFields.join(" and ")} before uploading`,
           variant: "destructive",
         });
         return;
       }
       
-      const normalizedUrl = fileUrl.split("?")[0];
-      
       uploadMutation.mutate({
         ...uploadForm,
-        fileUrl: normalizedUrl,
+        fileUrl: fileUrl,
         fileName: uploadedFile.name || "unknown",
         fileSize: uploadedFile.size || 0,
       });
@@ -273,18 +275,39 @@ export default function AdminMaterials() {
 
                 <div className="space-y-2">
                   <Label>File Upload</Label>
-                  <ObjectUploader
-                    maxNumberOfFiles={1}
-                    maxFileSize={52428800}
-                    allowedFileTypes={['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.txt']}
-                    onGetUploadParameters={handleGetUploadParameters}
-                    onComplete={handleFileUploadComplete}
-                    buttonVariant="outline"
-                    buttonClassName="w-full"
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Choose File (PDF, DOC, PPT)
-                  </ObjectUploader>
+                  {uploadForm.title?.trim() && uploadForm.subjectId?.trim() ? (
+                    <ObjectUploader
+                      maxNumberOfFiles={1}
+                      maxFileSize={52428800}
+                      allowedFileTypes={['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.txt']}
+                      onGetUploadParameters={handleGetUploadParameters}
+                      onComplete={handleFileUploadComplete}
+                      buttonVariant="outline"
+                      buttonClassName="w-full"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Choose File (PDF, DOC, PPT)
+                    </ObjectUploader>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => {
+                        const missingFields = [];
+                        if (!uploadForm.title?.trim()) missingFields.push("title");
+                        if (!uploadForm.subjectId?.trim()) missingFields.push("subject");
+                        toast({
+                          title: "Missing Information",
+                          description: `Please fill in the ${missingFields.join(" and ")} before uploading a file`,
+                          variant: "destructive",
+                        });
+                      }}
+                      data-testid="button-upload-disabled"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Choose File (PDF, DOC, PPT)
+                    </Button>
+                  )}
                   <p className="text-sm text-muted-foreground">Maximum file size: 50MB</p>
                 </div>
               </TabsContent>

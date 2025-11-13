@@ -479,6 +479,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Extract subjects array from request body
       const { subjects, ...planData } = req.body;
       
+      // Round hoursPerWeek to integer if it's a decimal
+      if (planData.hoursPerWeek !== undefined) {
+        planData.hoursPerWeek = Math.round(planData.hoursPerWeek);
+      }
+      
       // CRITICAL: Validate ALL input upfront before ANY database operations
       // This ensures we never touch the database if validation fails
       const validatedPlanData = insertStudyPlanSchema.parse({ ...planData, userId });
@@ -748,29 +753,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Material not found" });
       }
 
+      // If the fileUrl is a signed/external URL (contains :// for protocol or ? for query params),
+      // redirect to it directly without parsing to preserve signatures
+      if (material.fileUrl.includes('://') || material.fileUrl.includes('?')) {
+        // Signed URL, protocol-relative URL, or external URL - redirect directly
+        return res.redirect(material.fileUrl);
+      }
+
       const objectStorageService = new ObjectStorageService();
       
       // Extract object path from the fileUrl
       let objectPath = material.fileUrl;
       
-      // If it's a Google Cloud Storage URL, extract the bucket and object path
-      if (objectPath.includes('storage.googleapis.com')) {
-        try {
-          const url = new URL(objectPath);
-          // GCS URLs have format: https://storage.googleapis.com/<bucket>/<object-path>
-          // Extract everything after the domain
-          const pathParts = url.pathname.split('/').filter(part => part);
-          if (pathParts.length >= 2) {
-            // First part is bucket, rest is object path
-            const bucket = pathParts[0];
-            const objectKey = pathParts.slice(1).join('/');
-            objectPath = `/objects/${bucket}/${objectKey}`;
-          }
-        } catch (urlError) {
-          console.error("Error parsing GCS URL:", urlError);
-          return res.status(400).json({ message: "Invalid file URL" });
-        }
-      } else if (!objectPath.startsWith("/objects/")) {
+      if (!objectPath.startsWith("/objects/")) {
         // If it's a relative path, add /objects/ prefix
         objectPath = `/objects/${objectPath}`;
       }
