@@ -49,7 +49,9 @@ export default function GenerateQuiz() {
   const selectedSubjectId = form.watch("subjectId");
 
   const { data: materials, isLoading: materialsLoading } = useQuery<StudyMaterial[]>({
-    queryKey: ["/api/study-materials", { subjectId: selectedSubjectId }],
+    queryKey: selectedSubjectId 
+      ? [`/api/study-materials?subjectId=${selectedSubjectId}`] 
+      : ["/api/study-materials"],
     enabled: !!selectedSubjectId && isAuthenticated,
   });
 
