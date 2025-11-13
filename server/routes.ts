@@ -1096,11 +1096,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       // For regular students without a study plan, use yearLevel filter (no subjectIds)
 
-      // Fetch available exams with attempt metadata
+      // Fetch available exams with attempt metadata, filtering by program
       const exams = await storage.getAvailableExams(
         userId,
         user.yearLevel || undefined,
-        subjectIds.length > 0 ? subjectIds : undefined
+        subjectIds.length > 0 ? subjectIds : undefined,
+        user.programId || undefined
       );
 
       res.json(exams);

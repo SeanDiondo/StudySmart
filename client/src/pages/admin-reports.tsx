@@ -22,15 +22,21 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { BarChart3, FileText, Users, Search, Download } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import type { Subject, Quiz, QuizAttempt } from "@shared/schema";
+import type { Subject, Quiz, QuizAttempt, Program } from "@shared/schema";
 
 export default function AdminReports() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedProgram, setSelectedProgram] = useState<string>("all");
   const [selectedYearLevel, setSelectedYearLevel] = useState<string>("all");
   const [selectedExamType, setSelectedExamType] = useState<string>("all");
   const [selectedMaterialType, setSelectedMaterialType] = useState<string>("all");
   const [selectedSubject, setSelectedSubject] = useState<string>("all");
   const { isAuthenticated } = useAuth();
+
+  const { data: programs } = useQuery<Program[]>({
+    queryKey: ["/api/programs"],
+    enabled: isAuthenticated,
+  });
 
   const { data: subjects, isLoading: subjectsLoading, isError: subjectsError } = useQuery<Subject[]>({
     queryKey: ["/api/subjects"],
@@ -60,6 +66,15 @@ export default function AdminReports() {
     if (searchQuery && !exam.title.toLowerCase().includes(searchQuery.toLowerCase()) && 
         !(subject?.name?.toLowerCase() || "").includes(searchQuery.toLowerCase())) {
       return false;
+    }
+
+    // Program filter - filter by checking if subject belongs to the selected program
+    // Since we don't have subject-program mappings in the frontend yet,
+    // we skip program filtering for now and rely on subject filtering
+    // TODO: Implement full program filtering with subject-program mappings
+    if (selectedProgram !== 'all') {
+      // For now, program filter is informational only
+      // Full implementation would require fetching subject-program mappings
     }
 
     // Year level filter - skip if subjects still loading, filter out if subject missing when loaded
@@ -217,7 +232,7 @@ export default function AdminReports() {
           <CardDescription>Filter exams by criteria to view specific statistics</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div className="space-y-2">
               <Label htmlFor="search">Search</Label>
               <div className="relative">
@@ -231,6 +246,22 @@ export default function AdminReports() {
                   data-testid="input-search-exams"
                 />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="program">Program</Label>
+              <Select value={selectedProgram} onValueChange={setSelectedProgram}>
+                <SelectTrigger id="program" data-testid="select-program">
+                  <SelectValue placeholder="All Programs" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Programs</SelectItem>
+                  {(programs || []).map((program) => (
+                    <SelectItem key={program.id} value={program.id}>
+                      {program.code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="year-level">Year Level</Label>

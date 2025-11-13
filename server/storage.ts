@@ -596,7 +596,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(quizzes.id, id));
   }
 
-  async getAvailableExams(studentId: string, yearLevel?: string, subjectIds?: string[]): Promise<Array<Quiz & { attemptCount: number; lastAttemptAt: Date | null }>> {
+  async getAvailableExams(studentId: string, yearLevel?: string, subjectIds?: string[], programId?: string): Promise<Array<Quiz & { attemptCount: number; lastAttemptAt: Date | null }>> {
     // Build conditions array
     const conditions: any[] = [
       sql`${quizzes.examType} IN ('pre_test', 'post_test')`,
@@ -612,7 +612,12 @@ export class DatabaseStorage implements IStorage {
       conditions.push(inArray(subjects.id, subjectIds));
     }
 
-    // Build query with single where clause
+    // Add program filter if provided
+    if (programId) {
+      conditions.push(eq(subjectPrograms.programId, programId));
+    }
+
+    // Build query with single where clause, joining with subjectPrograms for program filtering
     const results = await db
       .select({
         quiz: quizzes,
@@ -621,6 +626,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(quizzes)
       .innerJoin(subjects, eq(quizzes.subjectId, subjects.id))
+      .leftJoin(subjectPrograms, eq(subjects.id, subjectPrograms.subjectId))
       .leftJoin(
         quizAttempts,
         and(

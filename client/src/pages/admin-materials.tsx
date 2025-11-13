@@ -81,18 +81,20 @@ export default function AdminMaterials() {
     enabled: isAuthenticated,
   });
 
-  // Fetch material set status for all subject+materialType combinations
-  const materialSetPairs = (materials || []).reduce((acc, material) => {
-    const key = `${material.subjectId}::${material.materialType}`;
-    if (!acc.find(p => p.key === key)) {
-      acc.push({
-        key,
-        subjectId: material.subjectId,
-        materialType: material.materialType as "midterm" | "finals"
-      });
-    }
-    return acc;
-  }, [] as Array<{ key: string; subjectId: string; materialType: "midterm" | "finals" }>);
+  // Fetch material set status for all subject+materialType combinations (only valid materials)
+  const materialSetPairs = (materials || [])
+    .filter(m => m.subjectId !== null) // Only include materials with valid subjectId
+    .reduce((acc, material) => {
+      const key = `${material.subjectId}::${material.materialType}`;
+      if (!acc.find(p => p.key === key)) {
+        acc.push({
+          key,
+          subjectId: material.subjectId!,
+          materialType: material.materialType as "midterm" | "finals"
+        });
+      }
+      return acc;
+    }, [] as Array<{ key: string; subjectId: string; materialType: "midterm" | "finals" }>);
 
   // Fetch all material set statuses in parallel using the default fetcher
   const materialSetQueries = useQuery<Record<string, MaterialSet | null>>({
@@ -309,19 +311,21 @@ export default function AdminMaterials() {
       (material.description && material.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  // Group materials by subject and material type
-  const materialsBySubject = (materials || []).reduce((acc, material) => {
-    const key = `${material.subjectId}::${material.materialType}`;
-    if (!acc[key]) {
-      acc[key] = {
-        subjectId: material.subjectId,
-        materialType: material.materialType,
-        materials: [],
-      };
-    }
-    acc[key].materials.push(material);
-    return acc;
-  }, {} as Record<string, { subjectId: string; materialType: string; materials: StudyMaterial[] }>);
+  // Group materials by subject and material type (only valid materials)
+  const materialsBySubject = (materials || [])
+    .filter(m => m.subjectId !== null) // Only include materials with valid subjectId
+    .reduce((acc, material) => {
+      const key = `${material.subjectId}::${material.materialType}`;
+      if (!acc[key]) {
+        acc[key] = {
+          subjectId: material.subjectId!,
+          materialType: material.materialType,
+          materials: [],
+        };
+      }
+      acc[key].materials.push(material);
+      return acc;
+    }, {} as Record<string, { subjectId: string; materialType: string; materials: StudyMaterial[] }>);
 
   const handleMarkComplete = (subjectId: string, materialType: "midterm" | "finals") => {
     markCompleteMutation.mutate({ subjectId, materialType });
