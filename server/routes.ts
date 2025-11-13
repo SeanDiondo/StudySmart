@@ -648,8 +648,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate and sanitize input
       const validatedData = insertStudyMaterialSchema.parse(dataWithUser);
       
-      // Basic URL validation to prevent injection
-      if (validatedData.fileUrl && !validatedData.fileUrl.match(/^https?:\/\//)) {
+      // URL validation: Accept full URLs (http/https) or normalized paths (starting with /)
+      // Normalized paths are used for object storage to generate fresh signed URLs
+      if (validatedData.fileUrl && !validatedData.fileUrl.match(/^(https?:\/\/|\/)/)) {
         return res.status(400).json({ message: "Invalid file URL format" });
       }
 
@@ -678,8 +679,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate and sanitize input
       const validatedData = insertStudyMaterialSchema.parse(dataWithUser);
       
-      // Basic URL validation to prevent injection
-      if (validatedData.fileUrl && !validatedData.fileUrl.match(/^https?:\/\//)) {
+      // URL validation: Accept full URLs (http/https) or normalized paths (starting with /)
+      // Normalized paths are used for object storage to generate fresh signed URLs
+      if (validatedData.fileUrl && !validatedData.fileUrl.match(/^(https?:\/\/|\/)/)) {
         return res.status(400).json({ message: "Invalid file URL format" });
       }
 
@@ -701,8 +703,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate and sanitize input
       const validatedData = insertStudyMaterialSchema.partial().parse(req.body);
       
-      // Basic URL validation if fileUrl is being updated
-      if (validatedData.fileUrl && !validatedData.fileUrl.match(/^https?:\/\//)) {
+      // URL validation: Accept full URLs (http/https) or normalized paths (starting with /)
+      if (validatedData.fileUrl && !validatedData.fileUrl.match(/^(https?:\/\/|\/)/)) {
         return res.status(400).json({ message: "Invalid file URL format" });
       }
 
