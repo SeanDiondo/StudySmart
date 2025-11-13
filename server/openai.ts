@@ -2,7 +2,7 @@
 // The newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 import OpenAI from "openai";
 import pLimit from "p-limit";
-import pRetry from "p-retry";
+import pRetry, { AbortError } from "p-retry";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || process.env.AI_INTEGRATIONS_OPENAI_API_KEY
@@ -52,7 +52,7 @@ Make the questions educational and test real understanding. Include clear explan
           if (isRateLimitError(error)) {
             throw error;
           }
-          throw new pRetry.AbortError(error);
+          throw new AbortError(error);
         }
       },
       {
@@ -101,7 +101,7 @@ Identify specific topics they excel at and areas needing improvement. Provide ac
           if (isRateLimitError(error)) {
             throw error;
           }
-          throw new pRetry.AbortError(error);
+          throw new AbortError(error);
         }
       },
       {

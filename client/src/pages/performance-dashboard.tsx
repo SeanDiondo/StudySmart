@@ -7,7 +7,7 @@ import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, R
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
-import { SelectQuizAttempt } from "@shared/schema";
+import type { QuizAttempt } from "@shared/schema";
 import { format } from "date-fns";
 
 interface PerformanceStats {
@@ -35,7 +35,7 @@ export default function PerformanceDashboard() {
   });
 
   // Fetch quiz attempts for history
-  const { data: attempts = [], isLoading: isLoadingAttempts } = useQuery<SelectQuizAttempt[]>({
+  const { data: attempts = [], isLoading: isLoadingAttempts } = useQuery<QuizAttempt[]>({
     queryKey: ["/api/quiz-attempts"],
     enabled: isAuthenticated,
   });
@@ -43,9 +43,8 @@ export default function PerformanceDashboard() {
   // Mutation to generate AI insights
   const insightsMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest<AIInsights>("/api/analytics/insights", {
-        method: "POST",
-      });
+      const response = await apiRequest("POST", "/api/analytics/insights");
+      return await response.json() as AIInsights;
     },
   });
 
