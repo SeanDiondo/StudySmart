@@ -740,6 +740,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Download study material
+  app.get("/api/study-materials/:id/download", isAuthenticated, async (req, res) => {
+    try {
+      const material = await storage.getStudyMaterial(req.params.id);
+      if (!material) {
+        return res.status(404).json({ message: "Material not found" });
+      }
+
+      const objectStorageService = new ObjectStorageService();
+      
+      // Extract object path from the fileUrl
+      let objectPath = material.fileUrl;
+      
+      // If it's a Google Cloud Storage URL, extract the bucket and object path
+      if (objectPath.includes('storage.googleapis.com')) {
+        try {
+          const url = new URL(objectPath);
+          // GCS URLs have format: https://storage.googleapis.com/<bucket>/<object-path>
+          // Extract everything after the domain
+          const pathParts = url.pathname.split('/').filter(part => part);
+          if (pathParts.length >= 2) {
+            // First part is bucket, rest is object path
+            const bucket = pathParts[0];
+            const objectKey = pathParts.slice(1).join('/');
+            objectPath = `/objects/${bucket}/${objectKey}`;
+          }
+        } catch (urlError) {
+          console.error("Error parsing GCS URL:", urlError);
+          return res.status(400).json({ message: "Invalid file URL" });
+        }
+      } else if (!objectPath.startsWith("/objects/")) {
+        // If it's a relative path, add /objects/ prefix
+        objectPath = `/objects/${objectPath}`;
+      }
+      
+      const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
+      
+      // Set download headers
+      res.setHeader('Content-Disposition', `attachment; filename="${material.fileName || 'download'}"`);
+      
+      await objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error downloading material:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.status(404).json({ message: "File not found" });
+      }
+      res.status(500).json({ message: "Failed to download material" });
+    }
+  });
+
   // Quiz routes
   app.post("/api/quizzes/generate", isAuthenticated, async (req: any, res) => {
     try {

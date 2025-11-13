@@ -123,7 +123,7 @@ export default function MaterialsLibrary() {
                   asChild
                   data-testid={`button-download-${material.id}`}
                 >
-                  <a href={material.fileUrl} download={material.fileName}>
+                  <a href={`/api/study-materials/${material.id}/download`} download={material.fileName}>
                     <Download className="h-4 w-4 mr-2" />
                     Download
                   </a>
