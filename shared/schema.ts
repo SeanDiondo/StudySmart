@@ -167,7 +167,7 @@ export type Quiz = typeof quizzes.$inferSelect;
 // Quiz Questions table
 export const quizQuestions = pgTable("quiz_questions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  quizId: varchar("quiz_id").notNull().references(() => quizzes.id),
+  quizId: varchar("quiz_id").notNull().references(() => quizzes.id, { onDelete: 'cascade' }),
   questionText: text("question_text").notNull(),
   questionType: text("question_type").notNull().default("multiple_choice"), // multiple_choice, true_false
   options: json("options").$type<string[]>().notNull(), // Array of answer options
@@ -187,7 +187,7 @@ export type QuizQuestion = typeof quizQuestions.$inferSelect;
 export const quizAttempts = pgTable("quiz_attempts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
-  quizId: varchar("quiz_id").notNull().references(() => quizzes.id),
+  quizId: varchar("quiz_id").notNull().references(() => quizzes.id, { onDelete: 'cascade' }),
   score: integer("score").notNull(), // percentage (0-100)
   totalQuestions: integer("total_questions").notNull(),
   correctAnswers: integer("correct_answers").notNull(),
@@ -207,8 +207,8 @@ export type QuizAttempt = typeof quizAttempts.$inferSelect;
 // Quiz Answers table (individual question responses)
 export const quizAnswers = pgTable("quiz_answers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  attemptId: varchar("attempt_id").notNull().references(() => quizAttempts.id),
-  questionId: varchar("question_id").notNull().references(() => quizQuestions.id),
+  attemptId: varchar("attempt_id").notNull().references(() => quizAttempts.id, { onDelete: 'cascade' }),
+  questionId: varchar("question_id").notNull().references(() => quizQuestions.id, { onDelete: 'cascade' }),
   userAnswer: text("user_answer").notNull(),
   isCorrect: boolean("is_correct").notNull(),
 });
