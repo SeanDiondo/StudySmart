@@ -2,13 +2,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, TrendingUp, TrendingDown, BookOpen, Brain, Plus } from "lucide-react";
+import { Calendar, Clock, TrendingUp, TrendingDown, BookOpen, Brain, Plus, FileCheck2 } from "lucide-react";
 import { Link } from "wouter";
 import { LoadingSkeleton } from "@/components/loading-spinner";
 import { EmptyState } from "@/components/empty-state";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import type { StudyPlan, QuizAttempt, PerformanceData, Subject, Quiz } from "@shared/schema";
+
+type ExamWithMetadata = Quiz & {
+  attemptCount: number;
+  lastAttemptAt: Date | null;
+};
 
 export default function StudentDashboard() {
   const { isAuthenticated } = useAuth();
@@ -35,6 +40,11 @@ export default function StudentDashboard() {
 
   const { data: quizzes } = useQuery<Quiz[]>({
     queryKey: ["/api/quizzes"],
+    enabled: isAuthenticated,
+  });
+
+  const { data: availableExams } = useQuery<ExamWithMetadata[]>({
+    queryKey: ["/api/exams/available"],
     enabled: isAuthenticated,
   });
 

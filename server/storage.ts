@@ -89,6 +89,7 @@ export interface IStorage {
   getQuiz(id: string): Promise<Quiz | undefined>;
   createQuiz(quiz: InsertQuiz): Promise<Quiz>;
   deleteQuiz(id: string): Promise<void>;
+  getAvailableExams(studentId: string, yearLevel?: string, subjectIds?: string[]): Promise<Array<Quiz & { attemptCount: number; lastAttemptAt: Date | null }>>;
   
   // Quiz Attempt operations
   getQuizAttempts(userId: string, quizId?: string): Promise<QuizAttempt[]>;
@@ -483,6 +484,49 @@ export class DatabaseStorage implements IStorage {
     await db.update(quizzes)
       .set({ isArchived: true })
       .where(eq(quizzes.id, id));
+  }
+
+  async getAvailableExams(studentId: string, yearLevel?: string, subjectIds?: string[]): Promise<Array<Quiz & { attemptCount: number; lastAttemptAt: Date | null }>> {
+    // Build conditions array
+    const conditions: any[] = [
+      sql`${quizzes.examType} IN ('pre_test', 'post_test')`,
+      eq(quizzes.isArchived, false)
+    ];
+
+    // Add optional filters to conditions
+    if (yearLevel) {
+      conditions.push(eq(subjects.yearLevel, yearLevel as any));
+    }
+    
+    if (subjectIds && subjectIds.length > 0) {
+      conditions.push(inArray(subjects.id, subjectIds));
+    }
+
+    // Build query with single where clause
+    const results = await db
+      .select({
+        quiz: quizzes,
+        attemptCount: sql<number>`CAST(COUNT(DISTINCT ${quizAttempts.id}) AS INTEGER)`.as('attempt_count'),
+        lastAttemptAt: sql<Date | null>`MAX(${quizAttempts.createdAt})`.as('last_attempt_at'),
+      })
+      .from(quizzes)
+      .innerJoin(subjects, eq(quizzes.subjectId, subjects.id))
+      .leftJoin(
+        quizAttempts,
+        and(
+          eq(quizAttempts.quizId, quizzes.id),
+          eq(quizAttempts.userId, studentId)
+        )
+      )
+      .where(and(...conditions))
+      .groupBy(quizzes.id);
+
+    // Transform results to Quiz & { attemptCount, lastAttemptAt }
+    return results.map(row => ({
+      ...row.quiz,
+      attemptCount: row.attemptCount || 0,
+      lastAttemptAt: row.lastAttemptAt || null,
+    }));
   }
 
   // Quiz Attempt operations

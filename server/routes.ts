@@ -952,6 +952,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Exam routes (Pre-Tests and Post-Tests)
+  app.get("/api/exams/available", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      if (user.role !== "student") {
+        return res.status(403).json({ message: "Only students can access available exams" });
+      }
+
+      // Determine which subjects the student can access
+      let subjectIds: string[] = [];
+      
+      // First check if student has an active study plan
+      const studyPlan = await storage.getStudyPlan(userId);
+      if (studyPlan && studyPlan.isActive) {
+        // Get subjects from study plan
+        const planSubjects = await storage.getStudyPlanSubjects(studyPlan.id);
+        subjectIds = planSubjects.map(ps => ps.subjectId);
+      } else if (!user.isRegular) {
+        // Irregular student - get assigned subjects
+        const assignments = await storage.getStudentAssignments(userId);
+        subjectIds = assignments.map((a: any) => a.subjectId);
+      }
+      // For regular students without a study plan, use yearLevel filter (no subjectIds)
+
+      // Fetch available exams with attempt metadata
+      const exams = await storage.getAvailableExams(
+        userId,
+        user.yearLevel || undefined,
+        subjectIds.length > 0 ? subjectIds : undefined
+      );
+
+      res.json(exams);
+    } catch (error) {
+      console.error("Error fetching available exams:", error);
+      res.status(500).json({ message: "Failed to fetch available exams" });
+    }
+  });
+
   // Quiz routes
   app.post("/api/quizzes/generate", isAuthenticated, async (req: any, res) => {
     try {
@@ -1007,10 +1051,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!quiz) {
         return res.status(404).json({ message: "Quiz not found" });
       }
-      // Verify ownership
-      if (quiz.userId !== userId) {
+      
+      // Check if quiz is archived
+      if (quiz.isArchived) {
+        return res.status(404).json({ message: "Quiz not found" });
+      }
+      
+      // Allow access if:
+      // 1. User owns the quiz (regular quiz)
+      // 2. Quiz is a public exam (pre_test or post_test) for students
+      const isOwner = quiz.userId === userId;
+      const isPublicExam = quiz.examType === "pre_test" || quiz.examType === "post_test";
+      
+      if (!isOwner && !isPublicExam) {
         return res.status(403).json({ message: "Not authorized to access this quiz" });
       }
+      
       res.json(quiz);
     } catch (error) {
       console.error("Error fetching quiz:", error);
