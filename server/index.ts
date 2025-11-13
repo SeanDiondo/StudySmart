@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedTestUsers } from "./seedTestUsers";
 import { seedDefaultSubjects } from "./seedDefaultSubjects";
+import { startStudyReminderScheduler } from "./studyReminder";
 
 const app = express();
 
@@ -52,6 +53,9 @@ app.use((req, res, next) => {
   // Seed test users and default subjects on startup
   await seedTestUsers();
   await seedDefaultSubjects();
+  
+  // Start the study reminder scheduler
+  startStudyReminderScheduler();
 
   const server = await registerRoutes(app);
 
