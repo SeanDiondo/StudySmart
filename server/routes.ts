@@ -610,8 +610,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Alias for study materials (used by frontend)
   app.get("/api/study-materials", isAuthenticated, async (req, res) => {
     try {
-      const { subjectId } = req.query;
-      const materials = await storage.getStudyMaterials(subjectId as string);
+      const { subjectId, materialType } = req.query;
+      const materials = await storage.getStudyMaterials(
+        subjectId as string, 
+        materialType as "midterm" | "finals" | undefined
+      );
       res.json(materials);
     } catch (error) {
       console.error("Error fetching study materials:", error);
@@ -812,6 +815,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "File not found" });
       }
       res.status(500).json({ message: "Failed to download material" });
+    }
+  });
+
+  // Material Set routes (Phase 1: Admin completion workflow)
+  app.get("/api/material-sets/status", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can access material set status" });
+      }
+
+      const { subjectId, materialType } = req.query;
+      if (!subjectId || !materialType) {
+        return res.status(400).json({ message: "subjectId and materialType are required" });
+      }
+
+      const materialSet = await storage.getMaterialSet(
+        subjectId as string,
+        materialType as "midterm" | "finals"
+      );
+      
+      res.json(materialSet || { 
+        subjectId, 
+        materialType, 
+        isCompleted: false,
+        preTestQuizId: null,
+        postTestQuizId: null 
+      });
+    } catch (error) {
+      console.error("Error fetching material set status:", error);
+      res.status(500).json({ message: "Failed to fetch material set status" });
+    }
+  });
+
+  app.post("/api/material-sets/mark-complete", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can mark material sets as complete" });
+      }
+
+      const { subjectId, materialType } = req.body;
+      if (!subjectId || !materialType) {
+        return res.status(400).json({ message: "subjectId and materialType are required" });
+      }
+
+      // Validate that materials exist for this subject+materialType
+      const materials = await storage.getStudyMaterials(subjectId, materialType);
+      if (materials.length === 0) {
+        return res.status(400).json({ 
+          message: `No materials uploaded for ${materialType}. Please upload materials first.` 
+        });
+      }
+
+      // Mark the material set as completed
+      const materialSet = await storage.markMaterialSetCompleted({
+        subjectId,
+        materialType,
+        completedBy: user.id,
+      });
+
+      res.json(materialSet);
+    } catch (error) {
+      console.error("Error marking material set as complete:", error);
+      res.status(500).json({ message: "Failed to mark material set as complete" });
     }
   });
 
