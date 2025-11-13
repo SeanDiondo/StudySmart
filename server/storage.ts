@@ -2,6 +2,7 @@
 import {
   users,
   subjects,
+  subjectPrograms,
   studyPlans,
   studyPlanSubjects,
   studyMaterials,
@@ -356,6 +357,57 @@ export class DatabaseStorage implements IStorage {
   async getStudyMaterial(id: string): Promise<StudyMaterial | undefined> {
     const [material] = await db.select().from(studyMaterials).where(eq(studyMaterials.id, id));
     return material || undefined;
+  }
+
+  // Subject validation for material uploads
+  async validateSubjectByName(params: {
+    subjectName: string;
+    programId?: string;
+    yearLevel?: string;
+  }): Promise<{ subjectId: string | null; status: "valid" | "pending" }> {
+    const { subjectName, programId, yearLevel } = params;
+    
+    // Normalize subject name for matching
+    const normalizedName = subjectName.trim().toLowerCase();
+    
+    // Try to find subject by name (case-insensitive)
+    const matchingSubjects = await db
+      .select()
+      .from(subjects)
+      .where(sql`LOWER(${subjects.name}) = ${normalizedName}`);
+    
+    if (matchingSubjects.length === 0) {
+      // Subject not found
+      return { subjectId: null, status: "pending" };
+    }
+    
+    // If we have a program, try to find subject-program mapping
+    if (programId) {
+      const subjectIds = matchingSubjects.map(s => s.id);
+      const subjectProgramMappings = await db
+        .select()
+        .from(subjectPrograms)
+        .where(and(
+          inArray(subjectPrograms.subjectId, subjectIds),
+          eq(subjectPrograms.programId, programId)
+        ));
+      
+      if (subjectProgramMappings.length > 0) {
+        // Found a subject-program match
+        return { subjectId: subjectProgramMappings[0].subjectId, status: "valid" };
+      }
+    }
+    
+    // If we have a year level, try to match by year level
+    if (yearLevel) {
+      const subjectWithYear = matchingSubjects.find(s => s.yearLevel === yearLevel);
+      if (subjectWithYear) {
+        return { subjectId: subjectWithYear.id, status: "valid" };
+      }
+    }
+    
+    // Return first matching subject if no program/year filtering
+    return { subjectId: matchingSubjects[0].id, status: "valid" };
   }
 
   async createStudyMaterial(materialData: InsertStudyMaterial): Promise<StudyMaterial> {

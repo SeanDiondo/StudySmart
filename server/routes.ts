@@ -642,9 +642,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Only admins can upload materials" });
       }
 
-      // Add uploadedBy field from authenticated user
+      const { subjectName, programId, yearLevel, ...materialData } = req.body;
+
+      // Validate subject if subjectName is provided
+      let subjectId = materialData.subjectId;
+      let subjectValidationStatus: "valid" | "pending" = "valid";
+      let rawSubjectName: string | undefined;
+
+      if (subjectName) {
+        const validation = await storage.validateSubjectByName({
+          subjectName,
+          programId,
+          yearLevel,
+        });
+        
+        subjectId = validation.subjectId;
+        subjectValidationStatus = validation.status;
+        
+        if (validation.status === "pending") {
+          rawSubjectName = subjectName;
+        }
+      }
+
+      // Prepare material data
       const dataWithUser = {
-        ...req.body,
+        ...materialData,
+        subjectId,
+        subjectValidationStatus,
+        rawSubjectName,
+        programId,
         uploadedBy: user.id,
       };
 
@@ -652,7 +678,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertStudyMaterialSchema.parse(dataWithUser);
       
       // URL validation: Accept full URLs (http/https) or normalized paths (starting with /)
-      // Normalized paths are used for object storage to generate fresh signed URLs
       if (validatedData.fileUrl && !validatedData.fileUrl.match(/^(https?:\/\/|\/)/)) {
         return res.status(400).json({ message: "Invalid file URL format" });
       }
@@ -673,9 +698,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Only admins can upload materials" });
       }
 
-      // Add uploadedBy field from authenticated user
+      const { subjectName, programId, yearLevel, ...materialData } = req.body;
+
+      // Validate subject if subjectName is provided
+      let subjectId = materialData.subjectId;
+      let subjectValidationStatus: "valid" | "pending" = "valid";
+      let rawSubjectName: string | undefined;
+
+      if (subjectName) {
+        const validation = await storage.validateSubjectByName({
+          subjectName,
+          programId,
+          yearLevel,
+        });
+        
+        subjectId = validation.subjectId;
+        subjectValidationStatus = validation.status;
+        
+        if (validation.status === "pending") {
+          rawSubjectName = subjectName;
+        }
+      }
+
+      // Prepare material data
       const dataWithUser = {
-        ...req.body,
+        ...materialData,
+        subjectId,
+        subjectValidationStatus,
+        rawSubjectName,
+        programId,
         uploadedBy: user.id,
       };
 
@@ -683,7 +734,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertStudyMaterialSchema.parse(dataWithUser);
       
       // URL validation: Accept full URLs (http/https) or normalized paths (starting with /)
-      // Normalized paths are used for object storage to generate fresh signed URLs
       if (validatedData.fileUrl && !validatedData.fileUrl.match(/^(https?:\/\/|\/)/)) {
         return res.status(400).json({ message: "Invalid file URL format" });
       }

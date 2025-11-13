@@ -10,6 +10,7 @@ export const dayOfWeekEnum = pgEnum("day_of_week", ["monday", "tuesday", "wednes
 export const yearLevelEnum = pgEnum("year_level", ["1", "2", "3", "4"]);
 export const materialTypeEnum = pgEnum("material_type", ["midterm", "finals"]);
 export const examTypeEnum = pgEnum("exam_type", ["quiz", "pre_test", "post_test"]);
+export const subjectValidationStatusEnum = pgEnum("subject_validation_status", ["valid", "pending", "invalid"]);
 
 // Session storage table (required for Replit Auth)
 export const sessions = pgTable(
@@ -22,6 +23,24 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
+// Programs table (degree programs: BSIT, BSCS, etc.)
+export const programs = pgTable("programs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: varchar("code").notNull().unique(), // e.g., "BSIT", "BSCS"
+  name: text("name").notNull(), // e.g., "Bachelor of Science in Information Technology"
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertProgramSchema = createInsertSchema(programs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertProgram = z.infer<typeof insertProgramSchema>;
+export type Program = typeof programs.$inferSelect;
+
 // Users table (integrated with Replit Auth + password for testing)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -31,11 +50,14 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   role: userRoleEnum("role").notNull().default("student"),
+  programId: varchar("program_id").references(() => programs.id, { onDelete: "set null" }), // Student's enrolled program (nullable for backward compatibility)
   yearLevel: yearLevelEnum("year_level").default("1"), // 1st to 4th year
   isRegular: boolean("is_regular").notNull().default(true), // Regular vs irregular student
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (table) => [
+  index("users_program_idx").on(table.programId),
+]);
 
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -65,6 +87,27 @@ export const insertSubjectSchema = createInsertSchema(subjects).omit({
 
 export type InsertSubject = z.infer<typeof insertSubjectSchema>;
 export type Subject = typeof subjects.$inferSelect;
+
+// Subject-Programs join table (subjects can be scoped to specific programs)
+export const subjectPrograms = pgTable("subject_programs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  subjectId: varchar("subject_id").notNull().references(() => subjects.id, { onDelete: "cascade" }),
+  programId: varchar("program_id").notNull().references(() => programs.id, { onDelete: "cascade" }),
+  yearLevel: yearLevelEnum("year_level"), // Optional: year level for this subject in this program
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("unique_subject_program").on(table.subjectId, table.programId),
+  index("subject_programs_program_idx").on(table.programId),
+  index("subject_programs_subject_idx").on(table.subjectId),
+]);
+
+export const insertSubjectProgramSchema = createInsertSchema(subjectPrograms).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSubjectProgram = z.infer<typeof insertSubjectProgramSchema>;
+export type SubjectProgram = typeof subjectPrograms.$inferSelect;
 
 // Student Subject Assignments table (for irregular students - admin assigns specific subjects)
 export const studentSubjectAssignments = pgTable("student_subject_assignments", {
@@ -131,14 +174,22 @@ export const studyMaterials = pgTable("study_materials", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
   description: text("description"),
-  subjectId: varchar("subject_id").notNull().references(() => subjects.id),
+  subjectId: varchar("subject_id").references(() => subjects.id), // Nullable - null when subject not recognized
+  subjectValidationStatus: subjectValidationStatusEnum("subject_validation_status").notNull().default("pending"), // Default pending for new uploads
+  rawSubjectName: text("raw_subject_name"), // Stores original subject name when not recognized (required when subjectId is null)
+  programId: varchar("program_id").references(() => programs.id, { onDelete: "set null" }), // Program context for validation
   fileUrl: text("file_url").notNull(),
   fileName: text("file_name").notNull(),
   fileSize: integer("file_size").notNull(), // in bytes
   materialType: materialTypeEnum("material_type").notNull().default("midterm"), // midterm or finals
   uploadedBy: varchar("uploaded_by").notNull().references(() => users.id),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
-});
+  validatedBy: varchar("validated_by").references(() => users.id), // Admin who validated/corrected the subject
+  validatedAt: timestamp("validated_at"),
+}, (table) => [
+  index("study_materials_program_idx").on(table.programId),
+  index("study_materials_validation_status_idx").on(table.subjectValidationStatus),
+]);
 
 export const insertStudyMaterialSchema = createInsertSchema(studyMaterials).omit({
   id: true,
