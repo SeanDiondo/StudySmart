@@ -49,6 +49,36 @@ Study materials are displayed in a subject-grouped layout on the Materials Libra
 -   **Alphabetical Sorting**: Subject sections are sorted alphabetically for easy navigation.
 -   **Preserved Functionality**: Search and filter capabilities remain intact, working seamlessly with the grouped display.
 
+### AI-Generated Pre-Test/Post-Test System (Phase 1: Admin Completion Workflow)
+
+The platform includes an automated exam generation system that creates Pre-Tests and Post-Tests based on completed study materials:
+
+**Phase 1 - Material Set Completion (Implemented):**
+
+-   **Material Type Classification**: Study materials are classified as either "Midterm" or "Finals" during upload. This categorization determines which exam period the materials belong to.
+-   **Material Set Tracking**: The system tracks material sets using the `materialSets` table, which stores completion status for each unique combination of subject and material type (e.g., "Database Systems - Midterm").
+-   **Admin Completion Workflow**: Administrators can mark a material set as "completed" once all materials for that subject/type have been uploaded. This triggers the preparation for AI exam generation.
+-   **Completion Persistence**: Material set completion status is persisted in the database with metadata including completion timestamp and the admin who marked it complete.
+-   **UI Status Display**: The Admin Materials page features a "Material Set Status" section that displays all uploaded material sets grouped by subject and type, showing material count, completion status, and completion date.
+
+**Database Schema Enhancements:**
+
+-   Added `materialType` enum ("midterm" | "finals") to the `studyMaterials` table
+-   Added `examType` enum ("quiz" | "pre_test" | "post_test") to the `quizzes` table
+-   Created `materialSets` table to track completion status with fields: `id`, `subjectId`, `materialType`, `isCompleted`, `completedAt`, `completedBy`, `preTestQuizId`, `postTestQuizId`
+-   Unique constraint on (`subjectId`, `materialType`) to prevent duplicate material sets
+
+**Backend API:**
+
+-   `GET /api/material-sets/status`: Retrieves completion status for a specific subject+materialType combination
+-   `POST /api/material-sets/mark-complete`: Marks a material set as completed (admin-only), validates that materials exist
+-   `GET /api/study-materials`: Enhanced with optional `materialType` query parameter for filtering
+
+**Future Phases:**
+
+-   Phase 2: AI exam generation service that automatically creates Pre-Tests and Post-Tests when material sets are marked complete
+-   Phase 3: Student dashboard integration to display available exams with notifications and comprehensive reporting for administrators
+
 ## External Dependencies
 
 ### Third-Party Services
