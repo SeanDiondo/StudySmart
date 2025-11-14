@@ -118,10 +118,17 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/logout", (req, res) => {
     req.logout(() => {
+      // Force HTTPS in production (published sites) to avoid OAuth invalid_request errors
+      // In development, req.protocol works correctly, but in production behind Replit's reverse proxy,
+      // we need to ensure the redirect URI uses HTTPS
+      const protocol = process.env.NODE_ENV === 'production' || req.hostname.includes('.replit.app') 
+        ? 'https' 
+        : req.protocol;
+      
       res.redirect(
         client.buildEndSessionUrl(config, {
           client_id: process.env.REPL_ID!,
-          post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
+          post_logout_redirect_uri: `${protocol}://${req.hostname}`,
         }).href
       );
     });

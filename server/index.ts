@@ -8,6 +8,10 @@ import { startStudyReminderScheduler } from "./studyReminder";
 
 const app = express();
 
+// Trust the reverse proxy in production (Replit's infrastructure)
+// This ensures req.protocol, req.hostname, and req.ip are set correctly
+app.set('trust proxy', 1);
+
 declare module 'http' {
   interface IncomingMessage {
     rawBody: unknown
