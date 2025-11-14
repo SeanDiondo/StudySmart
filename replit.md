@@ -9,7 +9,7 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### Frontend
-The frontend uses React 18 with TypeScript, Vite, Wouter for routing, TanStack Query for server state, shadcn/ui for components, and Tailwind CSS for styling. It features a custom design system with Inter and Lexend fonts, defined spacing, and a HSL-based color palette supporting light/dark modes.
+The frontend uses React 18 with TypeScript, Vite, Wouter for routing, TanStack Query for server state, shadcn/ui for components, and Tailwind CSS for styling. It features a custom design system with Inter and Lexend fonts, defined spacing, and a HSL-based color palette supporting light/dark modes. Navigation is implemented using a collapsible left sidebar (using Shadcn sidebar primitives) with a hamburger menu toggle, starting in collapsed state for a clean interface.
 
 ### Backend
 The backend is built with Express.js and TypeScript, using Drizzle ORM for Neon PostgreSQL. It integrates the OpenAI API for AI functionalities and Passport.js with OpenID Connect for Replit authentication. The API follows RESTful principles with session-based authentication and role-based authorization.

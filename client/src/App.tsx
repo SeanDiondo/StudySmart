@@ -8,6 +8,8 @@ import { NavHeader } from "@/components/nav-header";
 import { useAuth } from "@/hooks/useAuth";
 import { Redirect } from "wouter";
 import { ProtectedRoute } from "@/components/protected-route";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/app-sidebar";
 
 // Pages
 import Landing from "@/pages/landing";
@@ -45,40 +47,62 @@ function Router() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-background">
-      {isAuthenticated && user && <NavHeader user={user} />}
-      <main className={isAuthenticated ? "container mx-auto px-4 md:px-6 lg:px-8 py-8" : ""}>
+  // Public routes without sidebar
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-background">
         <Switch>
-          {/* Public routes */}
-          <Route path="/" component={isAuthenticated ? () => <ProtectedRoute><StudentDashboard /></ProtectedRoute> : Landing} />
-          <Route path="/login" component={isAuthenticated ? () => <Redirect to="/dashboard" /> : Login} />
-          <Route path="/signup" component={isAuthenticated ? () => <Redirect to="/dashboard" /> : Signup} />
-          <Route path="/forgot-password" component={isAuthenticated ? () => <Redirect to="/dashboard" /> : ForgotPassword} />
-          
-          {/* Protected routes - always present, ProtectedRoute handles redirect */}
-          <Route path="/dashboard">{() => <ProtectedRoute><StudentDashboard /></ProtectedRoute>}</Route>
-          <Route path="/study-plans">{() => <ProtectedRoute><StudyPlansList /></ProtectedRoute>}</Route>
-          <Route path="/study-plans/new">{() => <ProtectedRoute><CreateStudyPlan /></ProtectedRoute>}</Route>
-          <Route path="/quizzes">{() => <ProtectedRoute><AvailableQuizzes /></ProtectedRoute>}</Route>
-          <Route path="/quizzes/available">{() => <ProtectedRoute><AvailableQuizzes /></ProtectedRoute>}</Route>
-          <Route path="/quiz/generate">{() => <ProtectedRoute><GenerateQuiz /></ProtectedRoute>}</Route>
-          <Route path="/quiz/:id">{() => <ProtectedRoute><QuizInterface /></ProtectedRoute>}</Route>
-          <Route path="/quiz/results/:id">{() => <ProtectedRoute><QuizResults /></ProtectedRoute>}</Route>
-          <Route path="/performance">{() => <ProtectedRoute><PerformanceDashboard /></ProtectedRoute>}</Route>
-          <Route path="/materials">{() => <ProtectedRoute><MaterialsLibrary /></ProtectedRoute>}</Route>
-          <Route path="/exams">{() => <ProtectedRoute><Exams /></ProtectedRoute>}</Route>
-          <Route path="/profile">{() => <ProtectedRoute><Profile /></ProtectedRoute>}</Route>
-          <Route path="/admin/materials">{() => <ProtectedRoute><AdminMaterials /></ProtectedRoute>}</Route>
-          <Route path="/admin/subjects">{() => <ProtectedRoute><AdminSubjects /></ProtectedRoute>}</Route>
-          <Route path="/admin/users">{() => <ProtectedRoute><AdminUsers /></ProtectedRoute>}</Route>
-          <Route path="/admin/reports">{() => <ProtectedRoute><AdminReports /></ProtectedRoute>}</Route>
-          
-          {/* Catch-all */}
-          <Route path="/:rest*" component={NotFound} />
+          <Route path="/" component={Landing} />
+          <Route path="/login" component={Login} />
+          <Route path="/signup" component={Signup} />
+          <Route path="/forgot-password" component={ForgotPassword} />
+          <Route path="/:rest*" component={() => <Redirect to="/login" />} />
         </Switch>
-      </main>
-    </div>
+      </div>
+    );
+  }
+
+  // Authenticated routes with sidebar
+  return (
+    <SidebarProvider defaultOpen={false}>
+      <div className="flex h-screen w-full">
+        <AppSidebar user={user!} />
+        <SidebarInset className="flex flex-col flex-1">
+          <NavHeader user={user!} />
+          <main className="flex-1 overflow-auto">
+            <div className="container mx-auto px-4 md:px-6 lg:px-8 py-8">
+              <Switch>
+                <Route path="/" component={() => <Redirect to="/dashboard" />} />
+                <Route path="/login" component={() => <Redirect to="/dashboard" />} />
+                <Route path="/signup" component={() => <Redirect to="/dashboard" />} />
+                <Route path="/forgot-password" component={() => <Redirect to="/dashboard" />} />
+                
+                {/* Protected routes */}
+                <Route path="/dashboard">{() => <ProtectedRoute><StudentDashboard /></ProtectedRoute>}</Route>
+                <Route path="/study-plans">{() => <ProtectedRoute><StudyPlansList /></ProtectedRoute>}</Route>
+                <Route path="/study-plans/new">{() => <ProtectedRoute><CreateStudyPlan /></ProtectedRoute>}</Route>
+                <Route path="/quizzes">{() => <ProtectedRoute><AvailableQuizzes /></ProtectedRoute>}</Route>
+                <Route path="/quizzes/available">{() => <ProtectedRoute><AvailableQuizzes /></ProtectedRoute>}</Route>
+                <Route path="/quiz/generate">{() => <ProtectedRoute><GenerateQuiz /></ProtectedRoute>}</Route>
+                <Route path="/quiz/:id">{() => <ProtectedRoute><QuizInterface /></ProtectedRoute>}</Route>
+                <Route path="/quiz/results/:id">{() => <ProtectedRoute><QuizResults /></ProtectedRoute>}</Route>
+                <Route path="/performance">{() => <ProtectedRoute><PerformanceDashboard /></ProtectedRoute>}</Route>
+                <Route path="/materials">{() => <ProtectedRoute><MaterialsLibrary /></ProtectedRoute>}</Route>
+                <Route path="/exams">{() => <ProtectedRoute><Exams /></ProtectedRoute>}</Route>
+                <Route path="/profile">{() => <ProtectedRoute><Profile /></ProtectedRoute>}</Route>
+                <Route path="/admin/materials">{() => <ProtectedRoute><AdminMaterials /></ProtectedRoute>}</Route>
+                <Route path="/admin/subjects">{() => <ProtectedRoute><AdminSubjects /></ProtectedRoute>}</Route>
+                <Route path="/admin/users">{() => <ProtectedRoute><AdminUsers /></ProtectedRoute>}</Route>
+                <Route path="/admin/reports">{() => <ProtectedRoute><AdminReports /></ProtectedRoute>}</Route>
+                
+                {/* Catch-all */}
+                <Route path="/:rest*" component={NotFound} />
+              </Switch>
+            </div>
+          </main>
+        </SidebarInset>
+      </div>
+    </SidebarProvider>
   );
 }
 
