@@ -44,14 +44,19 @@ export default function CreateStudyPlan() {
   const [learningPace, setLearningPace] = useState("moderate");
   const [learningGoals, setLearningGoals] = useState("");
   
-  // Weekly calendar state: { "monday-09:00": true, "tuesday-14:00": true, ... }
-  const [selectedTimeSlots, setSelectedTimeSlots] = useState<Record<string, boolean>>({});
+  // Event-based schedule state (Google Calendar style)
+  const [scheduleEvents, setScheduleEvents] = useState<Array<{
+    id: string;
+    day: string; // "Monday", "Tuesday", etc.
+    startMinutes: number; // minutes from midnight (e.g., 540 = 9:00 AM)
+    endMinutes: number;
+    label: string; // e.g., "9:00 AM - 11:00 AM"
+  }>>([]);
   
   // Google Meet-style builder state
   const [builderDays, setBuilderDays] = useState<string[]>([]);
   const [builderStartTime, setBuilderStartTime] = useState("");
   const [builderEndTime, setBuilderEndTime] = useState("");
-  const [addedRanges, setAddedRanges] = useState<Array<{ id: string; days: string[]; startTime: string; endTime: string }>>([]);
 
   // Create study plan mutation
   const createPlanMutation = useMutation({
@@ -92,12 +97,32 @@ export default function CreateStudyPlan() {
     );
   };
 
-  // Time slots for calendar (30-minute intervals from 6 AM to 11:30 PM)
-  const timeSlots = [
-    "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
-    "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
-    "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30"
-  ];
+  // Generate time slots with 15-minute intervals from midnight to 11:45 PM
+  const generateTimeSlots = (startHour: number = 0, endHour: number = 24, intervalMinutes: number = 15): string[] => {
+    const slots: string[] = [];
+    for (let hour = startHour; hour < endHour; hour++) {
+      for (let minute = 0; minute < 60; minute += intervalMinutes) {
+        const hourStr = String(hour).padStart(2, '0');
+        const minuteStr = String(minute).padStart(2, '0');
+        slots.push(`${hourStr}:${minuteStr}`);
+      }
+    }
+    return slots;
+  };
+
+  const timeSlots = generateTimeSlots(0, 24, 15);
+
+  // Helper functions
+  const timeToMinutes = (time: string): number => {
+    const [hour, minute] = time.split(':').map(Number);
+    return hour * 60 + minute;
+  };
+
+  const minutesToTime = (minutes: number): string => {
+    const hour = Math.floor(minutes / 60);
+    const minute = minutes % 60;
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  };
 
   const formatTimeDisplay = (time: string) => {
     const [hourStr, minuteStr] = time.split(":");
@@ -107,14 +132,6 @@ export default function CreateStudyPlan() {
     const displayHour = hour === 0 ? 12 : (hour > 12 ? hour - 12 : hour);
     const period = isPM ? "PM" : "AM";
     return minute === "00" ? `${displayHour} ${period}` : `${displayHour}:${minute} ${period}`;
-  };
-
-  const handleTimeSlotToggle = (day: string, time: string) => {
-    const key = `${day.toLowerCase()}-${time}`;
-    setSelectedTimeSlots(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
   };
 
   const handleBuilderDayToggle = (day: string) => {
@@ -143,12 +160,10 @@ export default function CreateStudyPlan() {
       return;
     }
 
-    const timeToMinutes = (time: string): number => {
-      const [hour, minute] = time.split(':').map(Number);
-      return hour * 60 + minute;
-    };
+    const startMinutes = timeToMinutes(builderStartTime);
+    const endMinutes = timeToMinutes(builderEndTime);
 
-    if (timeToMinutes(builderStartTime) >= timeToMinutes(builderEndTime)) {
+    if (startMinutes >= endMinutes) {
       toast({
         title: "Invalid time range",
         description: "End time must be after start time",
@@ -157,32 +172,16 @@ export default function CreateStudyPlan() {
       return;
     }
 
-    // Create time slots for each selected day
-    const newSlots: Record<string, boolean> = { ...selectedTimeSlots };
-    const startMinutes = timeToMinutes(builderStartTime);
-    const endMinutes = timeToMinutes(builderEndTime);
+    // Create events for each selected day
+    const newEvents = builderDays.map(day => ({
+      id: `${Date.now()}-${Math.random()}-${day}`,
+      day,
+      startMinutes,
+      endMinutes,
+      label: `${formatTimeDisplay(builderStartTime)} - ${formatTimeDisplay(builderEndTime)}`,
+    }));
 
-    builderDays.forEach(day => {
-      // Generate 30-minute intervals from start to end
-      for (let minutes = startMinutes; minutes < endMinutes; minutes += 30) {
-        const hour = Math.floor(minutes / 60);
-        const minute = minutes % 60;
-        const timeStr = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-        const key = `${day.toLowerCase()}-${timeStr}`;
-        newSlots[key] = true;
-      }
-    });
-
-    setSelectedTimeSlots(newSlots);
-
-    // Add to ranges list
-    const rangeId = `${Date.now()}-${Math.random()}`;
-    setAddedRanges(prev => [...prev, {
-      id: rangeId,
-      days: [...builderDays],
-      startTime: builderStartTime,
-      endTime: builderEndTime,
-    }]);
+    setScheduleEvents(prev => [...prev, ...newEvents]);
 
     // Reset builder form
     setBuilderDays([]);
@@ -195,46 +194,22 @@ export default function CreateStudyPlan() {
     });
   };
 
-  const handleRemoveTimeRange = (rangeId: string) => {
-    const range = addedRanges.find(r => r.id === rangeId);
-    if (!range) return;
-
-    // Remove time slots from the calendar
-    const newSlots: Record<string, boolean> = { ...selectedTimeSlots };
-    const timeToMinutes = (time: string): number => {
-      const [hour, minute] = time.split(':').map(Number);
-      return hour * 60 + minute;
-    };
-
-    const startMinutes = timeToMinutes(range.startTime);
-    const endMinutes = timeToMinutes(range.endTime);
-
-    range.days.forEach(day => {
-      for (let minutes = startMinutes; minutes < endMinutes; minutes += 30) {
-        const hour = Math.floor(minutes / 60);
-        const minute = minutes % 60;
-        const timeStr = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-        const key = `${day.toLowerCase()}-${timeStr}`;
-        delete newSlots[key];
-      }
-    });
-
-    setSelectedTimeSlots(newSlots);
-    setAddedRanges(prev => prev.filter(r => r.id !== rangeId));
+  const handleRemoveEvent = (eventId: string) => {
+    setScheduleEvents(prev => prev.filter(e => e.id !== eventId));
   };
 
   const calculateTotalHours = () => {
-    // Each selected slot is 30 minutes = 0.5 hours
-    return Object.values(selectedTimeSlots).filter(Boolean).length * 0.5;
+    // Sum up all event durations (in minutes) and convert to hours
+    const totalMinutes = scheduleEvents.reduce((sum, event) => {
+      return sum + (event.endMinutes - event.startMinutes);
+    }, 0);
+    return totalMinutes / 60;
   };
 
   const getSelectedDaysCount = () => {
     const days = new Set<string>();
-    Object.keys(selectedTimeSlots).forEach(key => {
-      if (selectedTimeSlots[key]) {
-        const [day] = key.split("-");
-        days.add(day);
-      }
+    scheduleEvents.forEach(event => {
+      days.add(event.day);
     });
     return days.size;
   };
@@ -257,74 +232,15 @@ export default function CreateStudyPlan() {
       priority: subjectPriorities[subjectId] || 3,
     }));
 
-    // Build time slots from selected calendar blocks - preserve non-contiguous blocks
-    const timeSlotsByDay: Record<string, string[]> = {};
-    const dayCapitalization: Record<string, string> = {}; // Keep original capitalization
-    
-    Object.keys(selectedTimeSlots).forEach(key => {
-      if (selectedTimeSlots[key]) {
-        const [dayLower, time] = key.split("-");
-        // Find the original capitalized day name
-        const dayCapitalized = daysOfWeek.find(d => d.toLowerCase() === dayLower) || dayLower;
-        
-        if (!timeSlotsByDay[dayLower]) {
-          timeSlotsByDay[dayLower] = [];
-          dayCapitalization[dayLower] = dayCapitalized;
-        }
-        timeSlotsByDay[dayLower].push(time);
-      }
-    });
+    // Convert schedule events to time slots format expected by API
+    const availableTimeSlots: Array<{ day: string; startTime: string; endTime: string }> = scheduleEvents.map(event => ({
+      day: event.day,
+      startTime: minutesToTime(event.startMinutes),
+      endTime: minutesToTime(event.endMinutes),
+    }));
 
-    // Group contiguous time blocks per day (don't collapse gaps) - 30-minute intervals
-    const availableTimeSlots: Array<{ day: string; startTime: string; endTime: string }> = [];
-    
-    const timeToMinutes = (time: string): number => {
-      const [hour, minute] = time.split(':').map(Number);
-      return hour * 60 + minute;
-    };
-    
-    const minutesToTime = (minutes: number): string => {
-      const hour = Math.floor(minutes / 60) % 24;
-      const minute = minutes % 60;
-      return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-    };
-    
-    const add30Minutes = (time: string): string => {
-      return minutesToTime(timeToMinutes(time) + 30);
-    };
-    
-    Object.keys(timeSlotsByDay).forEach(day => {
-      const times = timeSlotsByDay[day].sort();
-      
-      // Group into contiguous blocks (30-minute increments)
-      let currentBlockStart = times[0];
-      let previousTime = times[0];
-      
-      for (let i = 1; i <= times.length; i++) {
-        const currentTime = times[i];
-        // Check if current time is exactly 30 minutes after previous time
-        const isContiguous = i < times.length && 
-          timeToMinutes(currentTime) === timeToMinutes(previousTime) + 30;
-        
-        if (!isContiguous) {
-          // End current block - endTime is 30 minutes after the last selected block
-          availableTimeSlots.push({
-            day: day.toLowerCase(),
-            startTime: currentBlockStart,
-            endTime: add30Minutes(previousTime)
-          });
-          
-          if (i < times.length) {
-            currentBlockStart = currentTime;
-          }
-        }
-        
-        previousTime = currentTime;
-      }
-    });
-
-    // Get unique days with proper capitalization
-    const uniqueDays = Object.keys(timeSlotsByDay).map(dayLower => dayCapitalization[dayLower]);
+    // Get unique days from events
+    const uniqueDays = Array.from(new Set(scheduleEvents.map(e => e.day)));
     const totalHours = calculateTotalHours();
 
     const planData = {
@@ -510,28 +426,26 @@ export default function CreateStudyPlan() {
                 </Button>
               </div>
 
-              {/* Added Ranges List */}
-              {addedRanges.length > 0 && (
+              {/* Schedule Events List */}
+              {scheduleEvents.length > 0 && (
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold">Added Time Slots</Label>
-                  <div className="space-y-2">
-                    {addedRanges.map((range) => (
+                  <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                    {scheduleEvents.map((event) => (
                       <div
-                        key={range.id}
+                        key={event.id}
                         className="flex items-center justify-between p-3 border border-border rounded-lg bg-background"
                       >
                         <div className="text-sm">
-                          <div className="font-medium">{range.days.join(', ')}</div>
-                          <div className="text-muted-foreground">
-                            {formatTimeDisplay(range.startTime)} - {formatTimeDisplay(range.endTime)}
-                          </div>
+                          <div className="font-medium">{event.day}</div>
+                          <div className="text-muted-foreground">{event.label}</div>
                         </div>
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleRemoveTimeRange(range.id)}
-                          data-testid={`button-remove-range-${range.id}`}
+                          onClick={() => handleRemoveEvent(event.id)}
+                          data-testid={`button-remove-event-${event.id}`}
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -545,77 +459,147 @@ export default function CreateStudyPlan() {
               <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
                 <div className="flex items-center gap-2">
                   <Clock className="h-5 w-5 text-primary" />
-                  <span className="font-semibold">{calculateTotalHours()} hours selected</span>
+                  <span className="font-semibold">{calculateTotalHours().toFixed(1)} hours selected</span>
                 </div>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    setSelectedTimeSlots({});
-                    setAddedRanges([]);
-                  }}
+                  onClick={() => setScheduleEvents([])}
                   data-testid="button-clear-schedule"
                 >
                   Clear All
                 </Button>
               </div>
 
-              {/* Weekly Calendar Grid */}
-              <div className="overflow-x-auto">
-                <div className="inline-block min-w-full">
-                  <div className="grid grid-cols-[100px_repeat(7,1fr)] border border-border rounded-lg overflow-hidden">
-                    {/* Header Row - Days of Week */}
-                    <div className="bg-muted p-3 border-r border-b border-border"></div>
-                    {daysOfWeek.map((day, index) => (
-                      <div
-                        key={day}
-                        className={`bg-muted p-3 text-center font-semibold text-sm border-b border-border ${
-                          index < daysOfWeek.length - 1 ? 'border-r' : ''
-                        }`}
-                        data-testid={`header-${day.toLowerCase()}`}
-                      >
-                        <div className="hidden md:block">{day}</div>
-                        <div className="md:hidden">{day.substring(0, 3)}</div>
-                      </div>
-                    ))}
+              {/* Google Calendar-Style Timeline */}
+              <div className="border border-border rounded-lg bg-background overflow-hidden">
+                <div className="grid grid-cols-[80px_repeat(7,1fr)] border-b border-border">
+                  {/* Empty corner */}
+                  <div className="bg-muted"></div>
+                  {/* Day headers */}
+                  {daysOfWeek.map((day, index) => (
+                    <div
+                      key={day}
+                      className={`bg-muted p-3 text-center font-semibold text-sm ${
+                        index < daysOfWeek.length - 1 ? 'border-r border-border' : ''
+                      }`}
+                      data-testid={`header-${day.toLowerCase()}`}
+                    >
+                      <div className="hidden md:block">{day}</div>
+                      <div className="md:hidden">{day.substring(0, 3)}</div>
+                    </div>
+                  ))}
+                </div>
 
-                    {/* Time Slot Rows */}
-                    {timeSlots.map((time, rowIndex) => (
-                      <div key={`row-${time}`} className="contents">
-                        {/* Time Label */}
-                        <div className={`bg-muted p-2 flex items-center justify-end text-xs text-muted-foreground font-medium border-r border-border ${
-                          rowIndex < timeSlots.length - 1 ? 'border-b' : ''
-                        }`}>
-                          {formatTimeDisplay(time)}
-                        </div>
+                {/* Timeline view */}
+                <div className="overflow-y-auto max-h-[600px]">
+                  <div className="grid grid-cols-[80px_repeat(7,1fr)] relative">
+                    {(() => {
+                      const displayHours = Array.from({ length: 24 }, (_, i) => i);
+                      const slotHeight = 60; // Height in pixels for each hour
+                      const totalHeight = 24 * slotHeight; // Total height for 24 hours
+                      
+                      // Helper to detect overlapping events
+                      type ScheduleEvent = { id: string; day: string; startMinutes: number; endMinutes: number; label: string };
+                      const getEventColumns = (dayEvents: ScheduleEvent[]) => {
+                        // Sort events by start time
+                        const sorted = [...dayEvents].sort((a, b) => a.startMinutes - b.startMinutes);
+                        const columns: ScheduleEvent[][] = [];
                         
-                        {/* Time Blocks for Each Day */}
-                        {daysOfWeek.map((day, colIndex) => {
-                          const key = `${day.toLowerCase()}-${time}`;
-                          const isSelected = selectedTimeSlots[key];
+                        sorted.forEach(event => {
+                          // Find a column where this event doesn't overlap
+                          let placed = false;
+                          for (const column of columns) {
+                            const overlaps = column.some(e => 
+                              event.startMinutes < e.endMinutes && event.endMinutes > e.startMinutes
+                            );
+                            if (!overlaps) {
+                              column.push(event);
+                              placed = true;
+                              break;
+                            }
+                          }
+                          if (!placed) {
+                            columns.push([event]);
+                          }
+                        });
+                        
+                        return columns;
+                      };
+                      
+                      return (
+                        <>
+                          {/* Time labels column */}
+                          <div className="sticky left-0 z-10">
+                            {displayHours.map((hour) => (
+                              <div
+                                key={hour}
+                                className="bg-muted p-2 flex items-start justify-end text-xs text-muted-foreground font-medium border-r border-b border-border h-[60px]"
+                              >
+                                {formatTimeDisplay(`${String(hour).padStart(2, '0')}:00`)}
+                              </div>
+                            ))}
+                          </div>
                           
-                          return (
-                            <div
-                              key={key}
-                              onClick={() => handleTimeSlotToggle(day, time)}
-                              className={`
-                                p-2 cursor-pointer hover-elevate active-elevate-2
-                                min-h-[36px] flex items-center justify-center
-                                ${rowIndex < timeSlots.length - 1 ? 'border-b border-border' : ''}
-                                ${colIndex < daysOfWeek.length - 1 ? 'border-r border-border' : ''}
-                                ${isSelected ? "bg-primary text-primary-foreground" : "bg-background"}
-                              `}
-                              data-testid={`timeslot-${day.toLowerCase()}-${time}`}
-                            >
-                              {isSelected && (
-                                <Check className="h-4 w-4" />
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))}
+                          {/* Day columns with events */}
+                          {daysOfWeek.map((day, colIndex) => {
+                            const dayEvents = scheduleEvents.filter(e => e.day === day);
+                            const eventColumns = getEventColumns(dayEvents);
+                            const numColumns = eventColumns.length;
+                            
+                            return (
+                              <div
+                                key={day}
+                                className={`relative ${
+                                  colIndex < daysOfWeek.length - 1 ? 'border-r border-border' : ''
+                                }`}
+                                style={{ height: `${totalHeight}px` }}
+                              >
+                                {/* Hour grid lines */}
+                                {displayHours.map((hour) => (
+                                  <div
+                                    key={hour}
+                                    className="absolute inset-x-0 border-b border-border"
+                                    style={{
+                                      top: `${hour * slotHeight}px`,
+                                      height: `${slotHeight}px`,
+                                    }}
+                                    data-testid={`timecell-${day.toLowerCase()}-${hour}`}
+                                  />
+                                ))}
+                                
+                                {/* Event bars */}
+                                {eventColumns.map((column, columnIndex) => 
+                                  column.map(event => {
+                                    const top = (event.startMinutes / 60) * slotHeight;
+                                    const height = ((event.endMinutes - event.startMinutes) / 60) * slotHeight;
+                                    const leftPercent = (columnIndex / numColumns) * 100;
+                                    const widthPercent = 100 / numColumns;
+                                    
+                                    return (
+                                      <div
+                                        key={event.id}
+                                        className="absolute bg-primary text-primary-foreground rounded-md p-2 text-xs overflow-hidden shadow-sm"
+                                        style={{
+                                          top: `${top}px`,
+                                          height: `${height}px`,
+                                          left: `${leftPercent}%`,
+                                          width: `calc(${widthPercent}% - 4px)`,
+                                        }}
+                                        data-testid={`event-bar-${event.id}`}
+                                      >
+                                        <div className="font-semibold truncate">{event.label}</div>
+                                      </div>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            );
+                          })}
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -627,10 +611,10 @@ export default function CreateStudyPlan() {
                   <h4 className="font-semibold text-sm">How to use:</h4>
                 </div>
                 <ul className="text-sm text-muted-foreground space-y-1 ml-7">
-                  <li>• Use the form above to quickly add time ranges for multiple days</li>
-                  <li>• Or click individual time blocks in the calendar below</li>
-                  <li>• Each block represents 30 minutes of study time</li>
-                  <li>• The calendar shows all your selected time slots</li>
+                  <li>• Use the form above to add time ranges for multiple days</li>
+                  <li>• The timeline below shows your schedule as horizontal bars (like Google Calendar)</li>
+                  <li>• Each time range appears as a colored bar on the selected days</li>
+                  <li>• Remove time slots using the X button in the "Added Time Slots" list</li>
                 </ul>
               </div>
 
