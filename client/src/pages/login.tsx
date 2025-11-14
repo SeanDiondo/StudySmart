@@ -22,15 +22,34 @@ export default function Login() {
     try {
       await apiRequest("POST", "/api/auth/password-login", { email, password });
       toast({
-        title: "Login successful",
-        description: "Welcome back!",
+        title: "Welcome back!",
+        description: "You have successfully logged in to your account.",
       });
       setLocation("/dashboard");
       window.location.reload(); // Reload to refresh auth state
     } catch (error: any) {
+      // Provide more descriptive error messages
+      let errorTitle = "Unable to Sign In";
+      let errorDescription = "Please check your credentials and try again";
+      
+      if (error.message) {
+        if (error.message.toLowerCase().includes("not found") || error.message.toLowerCase().includes("no user")) {
+          errorTitle = "Account Not Found";
+          errorDescription = "No account exists with this email address. Please check your email or sign up for a new account.";
+        } else if (error.message.toLowerCase().includes("password")) {
+          errorTitle = "Incorrect Password";
+          errorDescription = "The password you entered is incorrect. Please try again or use 'Forgot password' to reset it.";
+        } else if (error.message.toLowerCase().includes("network") || error.message.toLowerCase().includes("connection")) {
+          errorTitle = "Connection Error";
+          errorDescription = "Unable to connect to the server. Please check your internet connection and try again.";
+        } else {
+          errorDescription = error.message;
+        }
+      }
+      
       toast({
-        title: "Login failed",
-        description: error.message || "Invalid email or password",
+        title: errorTitle,
+        description: errorDescription,
         variant: "destructive",
       });
     } finally {

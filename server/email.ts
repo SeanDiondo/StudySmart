@@ -36,9 +36,8 @@ async function getCredentials() {
 // WARNING: Never cache this client.
 // Access tokens expire, so a new client must be created each time.
 async function getUncachableResendClient() {
-  const { apiKey } = await getCredentials();
-  // Override with custom email address for CCIT Study Plan
-  const fromEmail = 'noreply@ccitstudy.live';
+  const { apiKey, fromEmail } = await getCredentials();
+  // Use the verified from_email from Resend connection settings
   return {
     client: new Resend(apiKey),
     fromEmail: fromEmail

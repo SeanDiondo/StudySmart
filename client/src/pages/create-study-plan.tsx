@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Check } from "lucide-react";
+import { Check, X, Plus } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Calendar, Clock, Target, ChevronRight, ChevronLeft } from "lucide-react";
 import { useLocation } from "wouter";
@@ -13,6 +13,13 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import type { Subject } from "@shared/schema";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function CreateStudyPlan() {
   const [, setLocation] = useLocation();
@@ -39,6 +46,12 @@ export default function CreateStudyPlan() {
   
   // Weekly calendar state: { "monday-09:00": true, "tuesday-14:00": true, ... }
   const [selectedTimeSlots, setSelectedTimeSlots] = useState<Record<string, boolean>>({});
+  
+  // Google Meet-style builder state
+  const [builderDays, setBuilderDays] = useState<string[]>([]);
+  const [builderStartTime, setBuilderStartTime] = useState("");
+  const [builderEndTime, setBuilderEndTime] = useState("");
+  const [addedRanges, setAddedRanges] = useState<Array<{ id: string; days: string[]; startTime: string; endTime: string }>>([]);
 
   // Create study plan mutation
   const createPlanMutation = useMutation({
@@ -102,6 +115,112 @@ export default function CreateStudyPlan() {
       ...prev,
       [key]: !prev[key]
     }));
+  };
+
+  const handleBuilderDayToggle = (day: string) => {
+    setBuilderDays(prev =>
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
+    );
+  };
+
+  const handleAddTimeRange = () => {
+    // Validation
+    if (builderDays.length === 0) {
+      toast({
+        title: "Select days",
+        description: "Please select at least one day of the week",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!builderStartTime || !builderEndTime) {
+      toast({
+        title: "Select times",
+        description: "Please select both start and end times",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const timeToMinutes = (time: string): number => {
+      const [hour, minute] = time.split(':').map(Number);
+      return hour * 60 + minute;
+    };
+
+    if (timeToMinutes(builderStartTime) >= timeToMinutes(builderEndTime)) {
+      toast({
+        title: "Invalid time range",
+        description: "End time must be after start time",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Create time slots for each selected day
+    const newSlots: Record<string, boolean> = { ...selectedTimeSlots };
+    const startMinutes = timeToMinutes(builderStartTime);
+    const endMinutes = timeToMinutes(builderEndTime);
+
+    builderDays.forEach(day => {
+      // Generate 30-minute intervals from start to end
+      for (let minutes = startMinutes; minutes < endMinutes; minutes += 30) {
+        const hour = Math.floor(minutes / 60);
+        const minute = minutes % 60;
+        const timeStr = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+        const key = `${day.toLowerCase()}-${timeStr}`;
+        newSlots[key] = true;
+      }
+    });
+
+    setSelectedTimeSlots(newSlots);
+
+    // Add to ranges list
+    const rangeId = `${Date.now()}-${Math.random()}`;
+    setAddedRanges(prev => [...prev, {
+      id: rangeId,
+      days: [...builderDays],
+      startTime: builderStartTime,
+      endTime: builderEndTime,
+    }]);
+
+    // Reset builder form
+    setBuilderDays([]);
+    setBuilderStartTime("");
+    setBuilderEndTime("");
+
+    toast({
+      title: "Time range added",
+      description: `Added ${builderDays.join(', ')} from ${formatTimeDisplay(builderStartTime)} to ${formatTimeDisplay(builderEndTime)}`,
+    });
+  };
+
+  const handleRemoveTimeRange = (rangeId: string) => {
+    const range = addedRanges.find(r => r.id === rangeId);
+    if (!range) return;
+
+    // Remove time slots from the calendar
+    const newSlots: Record<string, boolean> = { ...selectedTimeSlots };
+    const timeToMinutes = (time: string): number => {
+      const [hour, minute] = time.split(':').map(Number);
+      return hour * 60 + minute;
+    };
+
+    const startMinutes = timeToMinutes(range.startTime);
+    const endMinutes = timeToMinutes(range.endTime);
+
+    range.days.forEach(day => {
+      for (let minutes = startMinutes; minutes < endMinutes; minutes += 30) {
+        const hour = Math.floor(minutes / 60);
+        const minute = minutes % 60;
+        const timeStr = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+        const key = `${day.toLowerCase()}-${timeStr}`;
+        delete newSlots[key];
+      }
+    });
+
+    setSelectedTimeSlots(newSlots);
+    setAddedRanges(prev => prev.filter(r => r.id !== rangeId));
   };
 
   const calculateTotalHours = () => {
@@ -310,11 +429,118 @@ export default function CreateStudyPlan() {
                 </div>
                 <div>
                   <CardTitle className="text-xl">Set Your Schedule</CardTitle>
-                  <CardDescription>Click time blocks to set when you're available to study</CardDescription>
+                  <CardDescription>Add time slots when you're available to study</CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Google Meet-Style Time Range Builder */}
+              <div className="space-y-4 p-4 border border-border rounded-lg bg-muted/30">
+                <h4 className="font-semibold text-sm flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Study Time
+                </h4>
+
+                {/* Day Checkboxes */}
+                <div>
+                  <Label className="text-sm mb-2 block">Select Days</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {daysOfWeek.map((day) => (
+                      <Button
+                        key={day}
+                        type="button"
+                        variant={builderDays.includes(day) ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleBuilderDayToggle(day)}
+                        className="min-w-[70px]"
+                        data-testid={`button-day-${day.toLowerCase()}`}
+                      >
+                        {builderDays.includes(day) && <Check className="h-3 w-3 mr-1" />}
+                        {day.substring(0, 3)}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Time Range Selectors */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="start-time" className="text-sm">Start Time</Label>
+                    <Select value={builderStartTime} onValueChange={setBuilderStartTime}>
+                      <SelectTrigger id="start-time" data-testid="select-start-time">
+                        <SelectValue placeholder="Select start time" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[200px]">
+                        {timeSlots.map((time) => (
+                          <SelectItem key={time} value={time}>
+                            {formatTimeDisplay(time)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="end-time" className="text-sm">End Time</Label>
+                    <Select value={builderEndTime} onValueChange={setBuilderEndTime}>
+                      <SelectTrigger id="end-time" data-testid="select-end-time">
+                        <SelectValue placeholder="Select end time" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[200px]">
+                        {timeSlots.map((time) => (
+                          <SelectItem key={time} value={time}>
+                            {formatTimeDisplay(time)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Add Button */}
+                <Button
+                  type="button"
+                  onClick={handleAddTimeRange}
+                  className="w-full"
+                  variant="secondary"
+                  data-testid="button-add-time-range"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Time Range
+                </Button>
+              </div>
+
+              {/* Added Ranges List */}
+              {addedRanges.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Added Time Slots</Label>
+                  <div className="space-y-2">
+                    {addedRanges.map((range) => (
+                      <div
+                        key={range.id}
+                        className="flex items-center justify-between p-3 border border-border rounded-lg bg-background"
+                      >
+                        <div className="text-sm">
+                          <div className="font-medium">{range.days.join(', ')}</div>
+                          <div className="text-muted-foreground">
+                            {formatTimeDisplay(range.startTime)} - {formatTimeDisplay(range.endTime)}
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveTimeRange(range.id)}
+                          data-testid={`button-remove-range-${range.id}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Summary */}
               <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
                 <div className="flex items-center gap-2">
@@ -325,7 +551,10 @@ export default function CreateStudyPlan() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setSelectedTimeSlots({})}
+                  onClick={() => {
+                    setSelectedTimeSlots({});
+                    setAddedRanges([]);
+                  }}
                   data-testid="button-clear-schedule"
                 >
                   Clear All
@@ -398,10 +627,10 @@ export default function CreateStudyPlan() {
                   <h4 className="font-semibold text-sm">How to use:</h4>
                 </div>
                 <ul className="text-sm text-muted-foreground space-y-1 ml-7">
-                  <li>• Click any time block to mark it as available</li>
-                  <li>• Click again to deselect</li>
+                  <li>• Use the form above to quickly add time ranges for multiple days</li>
+                  <li>• Or click individual time blocks in the calendar below</li>
                   <li>• Each block represents 30 minutes of study time</li>
-                  <li>• Select blocks that match your availability</li>
+                  <li>• The calendar shows all your selected time slots</li>
                 </ul>
               </div>
 
