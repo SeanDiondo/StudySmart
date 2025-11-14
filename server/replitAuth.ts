@@ -118,18 +118,31 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/logout", (req, res) => {
     req.logout(() => {
-      // Force HTTPS for all non-localhost domains to avoid OAuth invalid_request errors
-      // In production (published sites, custom domains), always use HTTPS
-      // Only use http for local development (localhost/127.0.0.1)
+      // Determine the correct redirect URI
+      // For custom domains, we need to use the Replit-provided domain for OAuth
+      // because custom domains are not automatically registered as valid redirect URIs
+      let redirectUri: string;
+      
       const isLocalhost = req.hostname === 'localhost' || 
                           req.hostname === '127.0.0.1' || 
                           req.hostname.endsWith('.replit.dev');
-      const protocol = isLocalhost ? req.protocol : 'https';
+      
+      if (isLocalhost) {
+        // Local development
+        redirectUri = `${req.protocol}://${req.hostname}`;
+      } else if (process.env.REPLIT_DOMAINS) {
+        // Use the primary Replit domain for OAuth (works for both .replit.app and custom domains)
+        const replitDomain = process.env.REPLIT_DOMAINS.split(',')[0];
+        redirectUri = `https://${replitDomain}`;
+      } else {
+        // Fallback to current hostname with HTTPS
+        redirectUri = `https://${req.hostname}`;
+      }
       
       res.redirect(
         client.buildEndSessionUrl(config, {
           client_id: process.env.REPL_ID!,
-          post_logout_redirect_uri: `${protocol}://${req.hostname}`,
+          post_logout_redirect_uri: redirectUri,
         }).href
       );
     });
