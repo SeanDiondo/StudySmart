@@ -116,33 +116,74 @@ export async function setupAuth(app: Express) {
     })(req, res, next);
   });
 
+  // Logout callback - handles the redirect back to the original domain after OAuth logout
+  app.get("/api/logout/callback", (req, res) => {
+    const returnTo = req.query.returnTo as string;
+    
+    // Security: Allowlist of valid redirect domains
+    const allowedDomains = [
+      'ccitstudy.live',
+      'localhost',
+      '127.0.0.1',
+    ];
+    
+    // Add all Replit domains to allowlist
+    if (process.env.REPLIT_DOMAINS) {
+      const replitDomains = process.env.REPLIT_DOMAINS.split(',');
+      allowedDomains.push(...replitDomains);
+    }
+    
+    // Validate the redirect URL
+    if (returnTo) {
+      try {
+        const url = new URL(returnTo);
+        const isAllowed = allowedDomains.some(domain => {
+          return url.hostname === domain || 
+                 url.hostname.endsWith('.replit.dev') || 
+                 url.hostname.endsWith('.replit.app');
+        });
+        
+        if (isAllowed) {
+          return res.redirect(returnTo);
+        }
+      } catch (e) {
+        // Invalid URL, fall through to default
+      }
+    }
+    
+    // Default redirect to root
+    res.redirect('/');
+  });
+
   app.get("/api/logout", (req, res) => {
     req.logout(() => {
-      // Determine the correct redirect URI
-      // For custom domains, we need to use the Replit-provided domain for OAuth
-      // because custom domains are not automatically registered as valid redirect URIs
-      let redirectUri: string;
-      
+      // Capture the current domain to return to after OAuth logout
       const isLocalhost = req.hostname === 'localhost' || 
                           req.hostname === '127.0.0.1' || 
                           req.hostname.endsWith('.replit.dev');
       
+      const protocol = isLocalhost ? req.protocol : 'https';
+      const returnToUrl = `${protocol}://${req.hostname}`;
+      
+      // Determine the OAuth logout redirect URI (must be a whitelisted domain)
+      let oauthRedirectUri: string;
+      
       if (isLocalhost) {
-        // Local development
-        redirectUri = `${req.protocol}://${req.hostname}`;
+        // Local development - direct redirect
+        oauthRedirectUri = returnToUrl;
       } else if (process.env.REPLIT_DOMAINS) {
-        // Use the primary Replit domain for OAuth (works for both .replit.app and custom domains)
+        // Production - use Replit domain with returnTo parameter
         const replitDomain = process.env.REPLIT_DOMAINS.split(',')[0];
-        redirectUri = `https://${replitDomain}`;
+        oauthRedirectUri = `https://${replitDomain}/api/logout/callback?returnTo=${encodeURIComponent(returnToUrl)}`;
       } else {
-        // Fallback to current hostname with HTTPS
-        redirectUri = `https://${req.hostname}`;
+        // Fallback
+        oauthRedirectUri = returnToUrl;
       }
       
       res.redirect(
         client.buildEndSessionUrl(config, {
           client_id: process.env.REPL_ID!,
-          post_logout_redirect_uri: redirectUri,
+          post_logout_redirect_uri: oauthRedirectUri,
         }).href
       );
     });
