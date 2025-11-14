@@ -27,6 +27,7 @@ import MaterialsLibrary from "@/pages/materials-library";
 import AvailableQuizzes from "@/pages/available-quizzes";
 import GenerateQuiz from "@/pages/generate-quiz";
 import Exams from "@/pages/exams";
+import ForgotPassword from "@/pages/forgot-password";
 import Profile from "@/pages/profile";
 import NotFound from "@/pages/not-found";
 
@@ -53,6 +54,7 @@ function Router() {
           <Route path="/" component={isAuthenticated ? () => <ProtectedRoute><StudentDashboard /></ProtectedRoute> : Landing} />
           <Route path="/login" component={isAuthenticated ? () => <Redirect to="/dashboard" /> : Login} />
           <Route path="/signup" component={isAuthenticated ? () => <Redirect to="/dashboard" /> : Signup} />
+          <Route path="/forgot-password" component={isAuthenticated ? () => <Redirect to="/dashboard" /> : ForgotPassword} />
           
           {/* Protected routes - always present, ProtectedRoute handles redirect */}
           <Route path="/dashboard">{() => <ProtectedRoute><StudentDashboard /></ProtectedRoute>}</Route>

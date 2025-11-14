@@ -24,10 +24,171 @@ import {
 export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
 
-  // Password login endpoint for testing
+  // Password authentication schemas
   const passwordLoginSchema = z.object({
     email: z.string().email(),
     password: z.string().min(1),
+  });
+
+  const signupSchema = z.object({
+    firstName: z.string().min(1),
+    lastName: z.string().min(1),
+    email: z.string().email(),
+    password: z.string().min(8),
+    role: z.enum(["student", "admin"]),
+  });
+
+  const forgotPasswordSchema = z.object({
+    email: z.string().email(),
+  });
+
+  const resetPasswordSchema = z.object({
+    email: z.string().email(),
+    verificationCode: z.string().length(6),
+    newPassword: z.string().min(8),
+  });
+
+  // In-memory store for verification codes (expires after 15 minutes)
+  const verificationCodes = new Map<string, { code: string; expiresAt: Date }>();
+
+  // Signup endpoint
+  app.post("/api/auth/signup", async (req: any, res) => {
+    try {
+      const { firstName, lastName, email, password, role } = signupSchema.parse(req.body);
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "An account with this email already exists" });
+      }
+
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Create user
+      const newUser = await storage.createUser({
+        email,
+        firstName,
+        lastName,
+        role,
+        password: hashedPassword,
+        programId: null,
+      });
+
+      // Create session
+      const sessionUser = {
+        claims: {
+          sub: newUser.id,
+          email: newUser.email,
+          first_name: newUser.firstName,
+          last_name: newUser.lastName,
+        },
+        role: newUser.role,
+      };
+
+      req.session.user = sessionUser;
+      
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err: any) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      res.json({
+        success: true,
+        user: {
+          id: newUser.id,
+          email: newUser.email,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          role: newUser.role,
+        },
+      });
+    } catch (error: any) {
+      console.error("Signup error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input data" });
+      }
+      res.status(500).json({ message: "Failed to create account" });
+    }
+  });
+
+  // Forgot password - Send verification code
+  app.post("/api/auth/forgot-password", async (req: any, res) => {
+    try {
+      const { email } = forgotPasswordSchema.parse(req.body);
+      
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        // Don't reveal if user exists for security
+        return res.json({ success: true, message: "If an account exists, a verification code will be sent" });
+      }
+
+      // Generate 6-digit code
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+      // Store code
+      verificationCodes.set(email, { code, expiresAt });
+
+      // Send email with verification code (dynamic import)
+      const { sendPasswordResetEmail } = await import('./email');
+      const emailSent = await sendPasswordResetEmail(email, user.firstName || 'User', code);
+      
+      if (!emailSent) {
+        console.error('Failed to send password reset email');
+      }
+
+      res.json({ success: true, message: "Verification code sent to your email" });
+    } catch (error: any) {
+      console.error("Forgot password error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid email address" });
+      }
+      res.status(500).json({ message: "Failed to process request" });
+    }
+  });
+
+  // Reset password with verification code
+  app.post("/api/auth/reset-password", async (req: any, res) => {
+    try {
+      const { email, verificationCode, newPassword } = resetPasswordSchema.parse(req.body);
+      
+      const storedCode = verificationCodes.get(email);
+      if (!storedCode) {
+        return res.status(400).json({ message: "Invalid or expired verification code" });
+      }
+
+      if (new Date() > storedCode.expiresAt) {
+        verificationCodes.delete(email);
+        return res.status(400).json({ message: "Verification code has expired" });
+      }
+
+      if (storedCode.code !== verificationCode) {
+        return res.status(400).json({ message: "Invalid verification code" });
+      }
+
+      // Get user and update password
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      await storage.updateUser(user.id, { password: hashedPassword });
+
+      // Clear verification code
+      verificationCodes.delete(email);
+
+      res.json({ success: true, message: "Password reset successfully" });
+    } catch (error: any) {
+      console.error("Reset password error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input data" });
+      }
+      res.status(500).json({ message: "Failed to reset password" });
+    }
   });
 
   app.post("/api/auth/password-login", async (req: any, res) => {
@@ -1000,7 +1161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
 
       // Generate Pre-Test and Post-Test IN PARALLEL (cuts time in half!)
-      console.log(`⏳ Generating Pre-Test and Post-Test for ${subject.name} (${materialType}) in parallel...`);
+      console.log(`Generating Pre-Test and Post-Test for ${subject.name} (${materialType}) in parallel...`);
       const [preTestResult, postTestResult] = await Promise.allSettled([
         generateExamFromMaterials(
           subject.name,
@@ -1018,22 +1179,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if Pre-Test generation succeeded
       if (preTestResult.status === "rejected") {
-        console.error(`❌ Pre-Test generation failed:`, preTestResult.reason);
+        console.error(`ERROR: Pre-Test generation failed:`, preTestResult.reason);
         throw new Error(`Failed to generate Pre-Test: ${preTestResult.reason.message || preTestResult.reason}`);
       }
       const preTestData = preTestResult.value;
-      console.log(`✓ Pre-Test generated: ${preTestData.title} (${preTestData.questions.length} questions)`);
+      console.log(`Pre-Test generated: ${preTestData.title} (${preTestData.questions.length} questions)`);
 
       // Check if Post-Test generation succeeded
       if (postTestResult.status === "rejected") {
-        console.error(`❌ Post-Test generation failed:`, postTestResult.reason);
+        console.error(`ERROR: Post-Test generation failed:`, postTestResult.reason);
         throw new Error(`Failed to generate Post-Test: ${postTestResult.reason.message || postTestResult.reason}`);
       }
       const postTestData = postTestResult.value;
-      console.log(`✓ Post-Test generated: ${postTestData.title} (${postTestData.questions.length} questions)`);
+      console.log(`Post-Test generated: ${postTestData.title} (${postTestData.questions.length} questions)`);
 
       // Create Pre-Test quiz in database
-      console.log(`💾 Creating Pre-Test quiz in database...`);
+      console.log(`Creating Pre-Test quiz in database...`);
       const preTestQuiz = await storage.createQuiz({
         userId: systemUser.id,
         subjectId,
@@ -1043,10 +1204,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         materialType: materialType as "midterm" | "finals",
         questions: preTestData.questions,
       });
-      console.log(`✓ Pre-Test quiz created with ID: ${preTestQuiz.id}`);
+      console.log(`Pre-Test quiz created with ID: ${preTestQuiz.id}`);
 
       // Create Post-Test quiz in database
-      console.log(`💾 Creating Post-Test quiz in database...`);
+      console.log(`Creating Post-Test quiz in database...`);
       const postTestQuiz = await storage.createQuiz({
         userId: systemUser.id,
         subjectId,
@@ -1056,10 +1217,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         materialType: materialType as "midterm" | "finals",
         questions: postTestData.questions,
       });
-      console.log(`✓ Post-Test quiz created with ID: ${postTestQuiz.id}`);
+      console.log(`Post-Test quiz created with ID: ${postTestQuiz.id}`);
 
       // Mark the material set as completed with quiz IDs
-      console.log(`💾 Marking material set as completed...`);
+      console.log(`Marking material set as completed...`);
       const materialSet = await storage.markMaterialSetCompleted({
         subjectId,
         materialType: materialType as "midterm" | "finals",
@@ -1068,7 +1229,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         postTestQuizId: postTestQuiz.id,
       });
 
-      console.log(`✓ Generated Pre-Test and Post-Test for ${subject.name} (${materialType})`);
+      console.log(`Generated Pre-Test and Post-Test for ${subject.name} (${materialType})`);
       
       // Send email notifications to eligible students (async, non-blocking)
       // This runs in the background and doesn't block the response
@@ -1076,10 +1237,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           // Guard: Ensure storage methods are available
           if (!storage || !storage.getAllUsers || !storage.getSubjectProgramMappings) {
-            console.error('⚠️ Storage not properly initialized for email notifications');
+            console.error('WARNING: Storage not properly initialized for email notifications');
             return;
           }
-          console.log(`📧 Sending exam availability notifications to eligible students...`);
+          console.log(`Sending exam availability notifications to eligible students...`);
           
           // Get all student users
           const allUsers = await storage.getAllUsers();
@@ -1101,7 +1262,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             eligibleStudents = eligibleStudents.filter(s => s.programId && programIds.has(s.programId));
           }
           
-          console.log(`📧 Found ${eligibleStudents.length} eligible students for notifications`);
+          console.log(`Found ${eligibleStudents.length} eligible students for notifications`);
           
           // Send notifications in parallel (non-blocking)
           const { sendExamAvailabilityNotification } = await import('./email');
@@ -1124,19 +1285,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const successCount = results.filter(r => r.status === 'fulfilled' && r.value !== null).length;
           const failCount = results.length - successCount;
           
-          console.log(`✓ Exam availability notifications sent: ${successCount} successful, ${failCount} failed`);
+          console.log(`Exam availability notifications sent: ${successCount} successful, ${failCount} failed`);
         } catch (notificationError) {
           // Don't fail the entire request if notifications fail
-          console.error(`⚠️ Error sending exam availability notifications:`, notificationError);
+          console.error(`WARNING: Error sending exam availability notifications:`, notificationError);
         }
       })().catch(err => {
         // Catch any uncaught rejections from the async IIFE
-        console.error('⚠️ Uncaught error in notification background task:', err);
+        console.error('WARNING: Uncaught error in notification background task:', err);
       });
       
       res.json(materialSet);
     } catch (error: any) {
-      console.error("❌ Error marking material set as complete:", error);
+      console.error("ERROR: Error marking material set as complete:", error);
       console.error("Error stack:", error.stack);
       console.error("Error message:", error.message);
       
@@ -1168,17 +1329,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "subjectId and materialType are required" });
       }
 
-      console.log(`⏳ Undoing completion for material set: ${subjectId} (${materialType})...`);
+      console.log(`Undoing completion for material set: ${subjectId} (${materialType})...`);
       
       const materialSet = await storage.undoMaterialSetCompletion({
         subjectId,
         materialType: materialType as "midterm" | "finals",
       });
 
-      console.log(`✓ Material set completion undone. Associated quizzes have been archived.`);
+      console.log(`Material set completion undone. Associated quizzes have been archived.`);
       res.json(materialSet);
     } catch (error: any) {
-      console.error("❌ Error undoing material set completion:", error);
+      console.error("ERROR: Error undoing material set completion:", error);
       res.status(500).json({ 
         message: error.message || "Failed to undo material set completion",
       });

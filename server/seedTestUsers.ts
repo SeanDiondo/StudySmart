@@ -38,12 +38,12 @@ export async function seedTestUsers() {
           lastName: user.lastName,
           role: user.role,
         });
-        console.log(`✓ Created test user: ${user.email}`);
+        console.log(`Created test user: ${user.email}`);
       } else {
-        console.log(`⊳ Test user already exists: ${user.email}`);
+        console.log(`Test user already exists: ${user.email}`);
       }
     } catch (error) {
-      console.error(`✗ Error creating test user ${user.email}:`, error);
+      console.error(`ERROR: Error creating test user ${user.email}:`, error);
     }
   }
 }

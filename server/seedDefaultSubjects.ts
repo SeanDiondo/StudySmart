@@ -24,7 +24,7 @@ const defaultSubjects = [
 
 export async function seedDefaultSubjects() {
   try {
-    console.log("⊳ Seeding default CCIT subjects...");
+    console.log("Seeding default CCIT subjects...");
     
     for (const subject of defaultSubjects) {
       // Check if subject already exists
@@ -46,12 +46,12 @@ export async function seedDefaultSubjects() {
           yearLevel: subject.yearLevel,
           isDefault: true,
         });
-        console.log(`⊳ Created default subject: ${subject.name} (Year ${subject.yearLevel})`);
+        console.log(`Created default subject: ${subject.name} (Year ${subject.yearLevel})`);
       }
       // DO NOT update existing subjects - preserve admin changes
     }
     
-    console.log("⊳ Default subjects seeding completed");
+    console.log("Default subjects seeding completed");
   } catch (error) {
     console.error("Error seeding default subjects:", error);
   }

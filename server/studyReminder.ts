@@ -8,7 +8,7 @@ const sentReminders = new Set<string>();
 // Clean up old reminders every hour (keep only last 2 hours)
 setInterval(() => {
   sentReminders.clear();
-  console.log('🧹 Cleared sent reminders cache');
+  console.log('Cleared sent reminders cache');
 }, 2 * 60 * 60 * 1000); // 2 hours
 
 function getCurrentDayAndTime(): { day: string; currentMinutes: number } {
@@ -95,7 +95,7 @@ export async function checkAndSendStudyReminders() {
 
 // Start the scheduler - check every minute
 export function startStudyReminderScheduler() {
-  console.log('📧 Study reminder scheduler started');
+  console.log('Study reminder scheduler started');
   
   // Check immediately on startup
   checkAndSendStudyReminders();

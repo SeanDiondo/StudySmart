@@ -17,7 +17,7 @@ const defaultPrograms = [
 
 export async function seedPrograms() {
   try {
-    console.log("⊳ Seeding degree programs...");
+    console.log("Seeding degree programs...");
     
     for (const program of defaultPrograms) {
       // Check if program already exists
@@ -34,7 +34,7 @@ export async function seedPrograms() {
           description: program.description,
           isActive: true,
         });
-        console.log(`⊳ Created program: ${program.code} - ${program.name}`);
+        console.log(`Created program: ${program.code} - ${program.name}`);
       } else {
         // Update existing program
         await db
@@ -45,12 +45,12 @@ export async function seedPrograms() {
             isActive: true,
           })
           .where(eq(programs.id, existing[0].id));
-        console.log(`⊳ Updated program: ${program.code} - ${program.name}`);
+        console.log(`Updated program: ${program.code} - ${program.name}`);
       }
     }
     
     // Migrate existing materials to have valid status
-    console.log("⊳ Migrating existing study materials...");
+    console.log("Migrating existing study materials...");
     const materialsToMigrate = await db
       .select()
       .from(studyMaterials)
@@ -67,10 +67,10 @@ export async function seedPrograms() {
           .where(eq(studyMaterials.id, material.id));
       }
       
-      console.log(`⊳ Migrated ${materialsWithSubject.length} existing materials to 'valid' status`);
+      console.log(`Migrated ${materialsWithSubject.length} existing materials to 'valid' status`);
     }
     
-    console.log("⊳ Program seeding and migration completed");
+    console.log("Program seeding and migration completed");
   } catch (error) {
     console.error("Error seeding programs:", error);
   }

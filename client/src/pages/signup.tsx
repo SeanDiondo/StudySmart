@@ -5,17 +5,57 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Brain } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Signup() {
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"student" | "admin">("student");
+  const [isLoading, setIsLoading] = useState(false);
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Will be connected to backend
+    setIsLoading(true);
+    
+    try {
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firstName, lastName, email, password, role }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        toast({
+          title: "Signup Failed",
+          description: data.message || "Failed to create account",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      toast({
+        title: "Account Created",
+        description: "Welcome to CCIT Study Plan!",
+      });
+      
+      // Redirect to dashboard
+      setLocation('/dashboard');
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -39,17 +79,31 @@ export default function Signup() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSignup} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
-                <Input
-                  id="name"
-                  type="text"
-                  placeholder="John Doe"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  data-testid="input-name"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">First Name</Label>
+                  <Input
+                    id="firstName"
+                    type="text"
+                    placeholder="John"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                    data-testid="input-firstname"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    type="text"
+                    placeholder="Doe"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                    data-testid="input-lastname"
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
@@ -94,8 +148,8 @@ export default function Signup() {
                   </div>
                 </RadioGroup>
               </div>
-              <Button type="submit" className="w-full" size="lg" data-testid="button-signup-submit">
-                Create Account
+              <Button type="submit" className="w-full" size="lg" disabled={isLoading} data-testid="button-signup-submit">
+                {isLoading ? "Creating Account..." : "Create Account"}
               </Button>
             </form>
 

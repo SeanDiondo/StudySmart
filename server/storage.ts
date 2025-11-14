@@ -558,44 +558,44 @@ export class DatabaseStorage implements IStorage {
     subjectId: string;
     materialType: "midterm" | "finals";
   }): Promise<MaterialSet> {
-    console.log(`🔍 Finding material set for subject ${params.subjectId}, type ${params.materialType}`);
+    console.log(`Finding material set for subject ${params.subjectId}, type ${params.materialType}`);
     const materialSet = await this.getMaterialSet(params.subjectId, params.materialType);
     
     if (!materialSet) {
-      console.error(`❌ Material set not found for subject ${params.subjectId}, type ${params.materialType}`);
+      console.error(`ERROR: Material set not found for subject ${params.subjectId}, type ${params.materialType}`);
       throw new Error("Material set not found");
     }
 
-    console.log(`📦 Found material set:`, { id: materialSet.id, isCompleted: materialSet.isCompleted, preTestQuizId: materialSet.preTestQuizId, postTestQuizId: materialSet.postTestQuizId });
+    console.log(`Found material set:`, { id: materialSet.id, isCompleted: materialSet.isCompleted, preTestQuizId: materialSet.preTestQuizId, postTestQuizId: materialSet.postTestQuizId });
 
     if (!materialSet.isCompleted) {
-      console.error(`❌ Material set is not completed`);
+      console.error(`ERROR: Material set is not completed`);
       throw new Error("Material set is not completed");
     }
 
     // Archive the associated quizzes (soft delete)
     if (materialSet.preTestQuizId) {
-      console.log(`📝 Archiving Pre-Test quiz: ${materialSet.preTestQuizId}`);
+      console.log(`Archiving Pre-Test quiz: ${materialSet.preTestQuizId}`);
       const result = await db
         .update(quizzes)
         .set({ isArchived: true })
         .where(eq(quizzes.id, materialSet.preTestQuizId))
         .returning();
-      console.log(`✓ Pre-Test archived:`, result.length > 0 ? 'success' : 'no rows updated');
+      console.log(`Pre-Test archived:`, result.length > 0 ? 'success' : 'no rows updated');
     }
 
     if (materialSet.postTestQuizId) {
-      console.log(`📝 Archiving Post-Test quiz: ${materialSet.postTestQuizId}`);
+      console.log(`Archiving Post-Test quiz: ${materialSet.postTestQuizId}`);
       const result = await db
         .update(quizzes)
         .set({ isArchived: true })
         .where(eq(quizzes.id, materialSet.postTestQuizId))
         .returning();
-      console.log(`✓ Post-Test archived:`, result.length > 0 ? 'success' : 'no rows updated');
+      console.log(`Post-Test archived:`, result.length > 0 ? 'success' : 'no rows updated');
     }
 
     // Unmark the material set as completed
-    console.log(`📝 Updating material set to mark as not completed...`);
+    console.log(`Updating material set to mark as not completed...`);
     const [updatedSet] = await db
       .update(materialSets)
       .set({
@@ -612,11 +612,11 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     if (!updatedSet) {
-      console.error(`❌ Failed to update material set - no rows matched`);
+      console.error(`ERROR: Failed to update material set - no rows matched`);
       throw new Error("Failed to update material set");
     }
 
-    console.log(`✓ Material set updated successfully:`, { id: updatedSet.id, isCompleted: updatedSet.isCompleted });
+    console.log(`Material set updated successfully:`, { id: updatedSet.id, isCompleted: updatedSet.isCompleted });
     return updatedSet;
   }
 

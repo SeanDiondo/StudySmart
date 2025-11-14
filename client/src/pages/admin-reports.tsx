@@ -33,6 +33,66 @@ export default function AdminReports() {
   const [selectedSubject, setSelectedSubject] = useState<string>("all");
   const { isAuthenticated } = useAuth();
 
+  // Helper function to properly escape CSV values
+  const escapeCSVValue = (value: string | number): string => {
+    if (typeof value === 'number') {
+      return value.toString();
+    }
+    // If value contains comma, quote, or newline, wrap in quotes and escape quotes
+    if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+      return `"${value.replace(/"/g, '""')}"`;
+    }
+    return value;
+  };
+
+  // Export function to download reports as CSV
+  const exportToCSV = () => {
+    if (examStats.length === 0) {
+      return;
+    }
+
+    // CSV headers
+    const headers = [
+      'Exam Title',
+      'Subject',
+      'Exam Type',
+      'Material Type',
+      'Year Level',
+      'Total Attempts',
+      'Unique Students',
+      'Average Score (%)',
+    ];
+
+    // CSV rows with proper escaping
+    const rows = examStats.map(stat => [
+      escapeCSVValue(stat.exam.title),
+      escapeCSVValue(stat.subject?.name || 'N/A'),
+      escapeCSVValue(stat.exam.examType === 'pre_test' ? 'Pre-Test' : 'Post-Test'),
+      escapeCSVValue(stat.exam.materialType === 'midterm' ? 'Midterm' : 'Finals'),
+      escapeCSVValue(stat.subject?.yearLevel || 'N/A'),
+      escapeCSVValue(stat.totalAttempts),
+      escapeCSVValue(stat.uniqueStudents),
+      escapeCSVValue(stat.avgScore),
+    ]);
+
+    // Combine headers and rows
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(',')),
+    ].join('\n');
+
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `exam-reports-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const { data: programs } = useQuery<Program[]>({
     queryKey: ["/api/programs"],
     enabled: isAuthenticated,
@@ -146,11 +206,23 @@ export default function AdminReports() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl md:text-4xl font-bold font-display">Exam Reports</h1>
-        <p className="text-muted-foreground mt-1">
-          View statistics and analytics for Pre-Tests and Post-Tests
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl md:text-4xl font-bold font-display">Exam Reports</h1>
+          <p className="text-muted-foreground mt-1">
+            View statistics and analytics for Pre-Tests and Post-Tests
+          </p>
+        </div>
+        {examStats.length > 0 && (
+          <Button
+            onClick={exportToCSV}
+            variant="outline"
+            data-testid="button-export-csv"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export to CSV
+          </Button>
+        )}
       </div>
 
       {/* Overall Stats Cards */}

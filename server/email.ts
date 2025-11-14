@@ -182,12 +182,12 @@ export async function sendStudyReminder(data: StudyReminderData) {
         <body>
           <div class="container">
             <div class="header">
-              <div class="logo">📚 CCIT Study Plan</div>
+              <div class="logo">CCIT Study Plan</div>
               <p style="color: #6b7280; margin: 0;">Your Personalized Learning Assistant</p>
             </div>
             
             <div class="alert">
-              <div class="alert-title">⏰ Reminder</div>
+              <div class="alert-title">Reminder</div>
               <div>${urgencyText}!</div>
             </div>
             
@@ -221,12 +221,12 @@ export async function sendStudyReminder(data: StudyReminderData) {
             </div>
             
             <p style="margin-top: 20px; padding: 15px; background-color: #eff6ff; border-radius: 6px; border-left: 4px solid #2563eb;">
-              <strong>💡 Study Tip:</strong> Gather your materials, find a quiet space, and eliminate distractions for maximum productivity!
+              <strong>Study Tip:</strong> Gather your materials, find a quiet space, and eliminate distractions for maximum productivity!
             </p>
             
             <div class="footer">
               <p>This is an automated reminder from CCIT Study Plan</p>
-              <p style="margin-top: 5px;">Keep up the great work! 🎯</p>
+              <p style="margin-top: 5px;">Keep up the great work!</p>
             </div>
           </div>
         </body>
@@ -254,27 +254,27 @@ This is an automated reminder from CCIT Study Plan.
 Keep up the great work!
     `.trim();
     
-    console.log(`📧 Attempting to send email from ${fromEmail} to ${data.recipientEmail}`);
+    console.log(`Attempting to send email from ${fromEmail} to ${data.recipientEmail}`);
     
     const result = await client.emails.send({
       from: fromEmail,
       to: data.recipientEmail,
-      subject: `📚 Study Reminder: ${data.subjectName} in ${data.minutesUntilStart} minutes`,
+      subject: `Study Reminder: ${data.subjectName} in ${data.minutesUntilStart} minutes`,
       html: htmlContent,
       text: textContent,
     });
     
     // Check for Resend API errors
     if (result.error) {
-      console.error('❌ Resend API error:', JSON.stringify(result.error));
+      console.error('ERROR: Resend API error:', JSON.stringify(result.error));
       throw new Error(`Resend error: ${result.error.message || JSON.stringify(result.error)}`);
     }
     
-    console.log(`✓ Study reminder sent successfully! Email ID:`, result.data?.id);
-    console.log(`✓ Study reminder sent to ${data.recipientEmail} for ${data.subjectName} (${data.minutesUntilStart}min)`);
+    console.log(`Study reminder sent successfully! Email ID:`, result.data?.id);
+    console.log(`Study reminder sent to ${data.recipientEmail} for ${data.subjectName} (${data.minutesUntilStart}min)`);
     return result;
   } catch (error: any) {
-    console.error('❌ Error sending study reminder:', error);
+    console.error('ERROR: Error sending study reminder:', error);
     console.error('Error details:', error.message, error.stack);
     throw error;
   }
@@ -394,12 +394,12 @@ export async function sendExamAvailabilityNotification(data: ExamAvailabilityDat
         <body>
           <div class="container">
             <div class="header">
-              <div class="logo">📚 CCIT Study Plan</div>
+              <div class="logo">CCIT Study Plan</div>
               <p style="color: #6b7280; margin: 0;">Your Personalized Learning Assistant</p>
             </div>
             
             <div class="alert">
-              <div class="alert-title">🎯 New Exams Available!</div>
+              <div class="alert-title">New Exams Available!</div>
               <div>Pre-Test and Post-Test are now ready for you to take</div>
             </div>
             
@@ -425,7 +425,7 @@ export async function sendExamAvailabilityNotification(data: ExamAvailabilityDat
             </div>
             
             <div class="exam-list">
-              <h3 style="color: #1e40af; margin-top: 0;">📝 Available Exams:</h3>
+              <h3 style="color: #1e40af; margin-top: 0;">Available Exams:</h3>
               <div class="exam-item">
                 <strong>Pre-Test:</strong> Assess your baseline knowledge before studying
               </div>
@@ -435,7 +435,7 @@ export async function sendExamAvailabilityNotification(data: ExamAvailabilityDat
             </div>
             
             <p style="margin-top: 20px; padding: 15px; background-color: #fef3c7; border-radius: 6px; border-left: 4px solid #f59e0b;">
-              <strong>💡 Pro Tip:</strong> Take the Pre-Test first to identify knowledge gaps, study the materials, then complete the Post-Test to measure your improvement!
+              <strong>Pro Tip:</strong> Take the Pre-Test first to identify knowledge gaps, study the materials, then complete the Post-Test to measure your improvement!
             </p>
             
             <div style="text-align: center; margin: 30px 0;">
@@ -445,7 +445,7 @@ export async function sendExamAvailabilityNotification(data: ExamAvailabilityDat
             
             <div class="footer">
               <p>This is an automated notification from CCIT Study Plan</p>
-              <p style="margin-top: 5px;">Good luck with your exams! 🌟</p>
+              <p style="margin-top: 5px;">Good luck with your exams!</p>
             </div>
           </div>
         </body>
@@ -477,26 +477,171 @@ This is an automated notification from CCIT Study Plan.
 Good luck with your exams!
     `.trim();
     
-    console.log(`📧 Sending exam availability notification to ${data.recipientEmail}`);
+    console.log(`Sending exam availability notification to ${data.recipientEmail}`);
     
     const result = await client.emails.send({
       from: fromEmail,
       to: data.recipientEmail,
-      subject: `🎯 New Exams Available: ${data.subjectName} - ${materialTypeDisplay}`,
+      subject: `New Exams Available: ${data.subjectName} - ${materialTypeDisplay}`,
       html: htmlContent,
       text: textContent,
     });
     
     if (result.error) {
-      console.error('❌ Resend API error:', JSON.stringify(result.error));
+      console.error('ERROR: Resend API error:', JSON.stringify(result.error));
       throw new Error(`Resend error: ${result.error.message || JSON.stringify(result.error)}`);
     }
     
-    console.log(`✓ Exam availability notification sent successfully! Email ID:`, result.data?.id);
+    console.log(`Exam availability notification sent successfully! Email ID:`, result.data?.id);
     return result;
   } catch (error: any) {
-    console.error('❌ Error sending exam availability notification:', error);
+    console.error('ERROR: Error sending exam availability notification:', error);
     console.error('Error details:', error.message, error.stack);
     throw error;
+  }
+}
+
+export async function sendPasswordResetEmail(
+  recipientEmail: string,
+  recipientName: string,
+  verificationCode: string
+): Promise<boolean> {
+  try {
+    const { client, fromEmail } = await getUncachableResendClient();
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .container {
+              background-color: #ffffff;
+              border-radius: 8px;
+              padding: 30px;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+            }
+            .logo {
+              font-size: 24px;
+              font-weight: bold;
+              color: #2563eb;
+              margin-bottom: 10px;
+            }
+            .code-box {
+              background-color: #f3f4f6;
+              border: 2px dashed #2563eb;
+              border-radius: 8px;
+              padding: 20px;
+              text-align: center;
+              margin: 30px 0;
+            }
+            .code {
+              font-size: 32px;
+              font-weight: bold;
+              color: #2563eb;
+              letter-spacing: 8px;
+              font-family: 'Courier New', monospace;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 30px;
+              padding-top: 20px;
+              border-top: 1px solid #e5e7eb;
+              color: #6b7280;
+              font-size: 14px;
+            }
+            .warning {
+              background-color: #fef3c7;
+              border-left: 4px solid #f59e0b;
+              padding: 15px;
+              margin: 20px 0;
+              border-radius: 4px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="logo">CCIT Study Plan</div>
+              <p style="color: #6b7280; margin: 0;">Password Reset Request</p>
+            </div>
+            
+            <h2 style="color: #111827;">Hello ${recipientName},</h2>
+            
+            <p>We received a request to reset your password. Use the verification code below to complete the process:</p>
+            
+            <div class="code-box">
+              <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 14px;">Your Verification Code</p>
+              <div class="code">${verificationCode}</div>
+              <p style="margin: 15px 0 0 0; color: #6b7280; font-size: 12px;">Valid for 15 minutes</p>
+            </div>
+            
+            <p>Enter this code on the password reset page to set your new password.</p>
+            
+            <div class="warning">
+              <strong>Security Notice:</strong> If you didn't request this password reset, please ignore this email. Your account remains secure.
+            </div>
+            
+            <div class="footer">
+              <p>This is an automated message from CCIT Study Plan</p>
+              <p style="margin-top: 5px;">For security, this code will expire in 15 minutes</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    const textContent = `
+CCIT Study Plan - Password Reset Request
+
+Hello ${recipientName},
+
+We received a request to reset your password. Use the verification code below to complete the process:
+
+Verification Code: ${verificationCode}
+
+This code is valid for 15 minutes.
+
+Enter this code on the password reset page to set your new password.
+
+SECURITY NOTICE: If you didn't request this password reset, please ignore this email. Your account remains secure.
+
+This is an automated message from CCIT Study Plan.
+For security, this code will expire in 15 minutes.
+    `.trim();
+    
+    console.log(`Sending password reset email to ${recipientEmail}`);
+    
+    const result = await client.emails.send({
+      from: fromEmail,
+      to: recipientEmail,
+      subject: 'Password Reset Code - CCIT Study Plan',
+      html: htmlContent,
+      text: textContent,
+    });
+    
+    if (result.error) {
+      console.error('ERROR: Resend API error:', JSON.stringify(result.error));
+      return false;
+    }
+    
+    console.log(`Password reset email sent successfully! Email ID:`, result.data?.id);
+    return true;
+  } catch (error: any) {
+    console.error('ERROR: Error sending password reset email:', error);
+    return false;
   }
 }

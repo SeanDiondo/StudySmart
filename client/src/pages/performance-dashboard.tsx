@@ -25,6 +25,25 @@ interface AIInsights {
   recommendations: string;
 }
 
+interface ExamPerformance {
+  summary: {
+    preTestAvg: number | null;
+    postTestAvg: number | null;
+    improvement: number | null;
+    totalPreTests: number;
+    totalPostTests: number;
+  };
+  bySubject: Array<{
+    subjectId: string;
+    subjectName: string;
+    preTestAvg: number | null;
+    postTestAvg: number | null;
+    improvement: number | null;
+    preTestAttempts: number;
+    postTestAttempts: number;
+  }>;
+}
+
 export default function PerformanceDashboard() {
   const { isAuthenticated } = useAuth();
 
@@ -37,6 +56,12 @@ export default function PerformanceDashboard() {
   // Fetch quiz attempts for history
   const { data: attempts = [], isLoading: isLoadingAttempts } = useQuery<QuizAttempt[]>({
     queryKey: ["/api/quiz-attempts"],
+    enabled: isAuthenticated,
+  });
+
+  // Fetch exam performance (Pre-Test and Post-Test analytics)
+  const { data: examPerformance, isLoading: isLoadingExamPerf } = useQuery<ExamPerformance>({
+    queryKey: ["/api/analytics/exam-performance"],
     enabled: isAuthenticated,
   });
 
@@ -167,6 +192,109 @@ export default function PerformanceDashboard() {
               </CardContent>
             </Card>
           </div>
+        </>
+      )}
+
+      {/* Pre-Test and Post-Test Analytics */}
+      {!isLoadingExamPerf && examPerformance && examPerformance.summary.totalPreTests + examPerformance.summary.totalPostTests > 0 && (
+        <>
+          <div className="flex items-center gap-2">
+            <GraduationCap className="h-6 w-6 text-primary" />
+            <h2 className="text-2xl font-bold font-display">Pre-Test & Post-Test Progress</h2>
+          </div>
+
+          {/* Exam Summary Stats */}
+          <div className="grid md:grid-cols-3 gap-6">
+            <Card data-testid="card-pretest-avg">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Pre-Test Average</CardTitle>
+                <FileCheck2 className="h-5 w-5 text-chart-3" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold font-display" data-testid="text-pretest-avg">
+                  {examPerformance.summary.preTestAvg !== null ? `${examPerformance.summary.preTestAvg}%` : 'N/A'}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {examPerformance.summary.totalPreTests} Pre-Test{examPerformance.summary.totalPreTests !== 1 ? 's' : ''} taken
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-posttest-avg">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Post-Test Average</CardTitle>
+                <GraduationCap className="h-5 w-5 text-chart-2" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold font-display" data-testid="text-posttest-avg">
+                  {examPerformance.summary.postTestAvg !== null ? `${examPerformance.summary.postTestAvg}%` : 'N/A'}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {examPerformance.summary.totalPostTests} Post-Test{examPerformance.summary.totalPostTests !== 1 ? 's' : ''} taken
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-improvement">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Improvement</CardTitle>
+                {examPerformance.summary.improvement !== null && examPerformance.summary.improvement >= 0 ? (
+                  <TrendingUp className="h-5 w-5 text-chart-2" />
+                ) : (
+                  <TrendingDown className="h-5 w-5 text-chart-4" />
+                )}
+              </CardHeader>
+              <CardContent>
+                <div className={`text-3xl font-bold font-display ${
+                  examPerformance.summary.improvement !== null && examPerformance.summary.improvement >= 0 
+                    ? 'text-chart-2' 
+                    : 'text-chart-4'
+                }`} data-testid="text-improvement">
+                  {examPerformance.summary.improvement !== null 
+                    ? `${examPerformance.summary.improvement >= 0 ? '+' : ''}${examPerformance.summary.improvement}%`
+                    : 'N/A'}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Post-Test vs Pre-Test
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Subject-wise Breakdown Chart */}
+          {examPerformance.bySubject.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Pre-Test vs Post-Test by Subject</CardTitle>
+                <CardDescription>Compare your baseline and final assessment scores</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart 
+                    data={examPerformance.bySubject.map(item => ({
+                      subject: item.subjectName.length > 20 ? item.subjectName.substring(0, 20) + '...' : item.subjectName,
+                      'Pre-Test': item.preTestAvg || 0,
+                      'Post-Test': item.postTestAvg || 0,
+                    }))}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="subject" className="text-xs" />
+                    <YAxis className="text-xs" domain={[0, 100]} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "0.5rem",
+                      }}
+                    />
+                    <Legend />
+                    <Bar dataKey="Pre-Test" fill="hsl(var(--chart-3))" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Post-Test" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
 
