@@ -54,6 +54,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Signup endpoint
   app.post("/api/auth/signup", async (req: any, res) => {
     try {
+      console.log("Signup request received:", { ...req.body, password: "[REDACTED]" });
       const { firstName, lastName, email, password, role } = signupSchema.parse(req.body);
       
       // Check if user already exists
@@ -65,15 +66,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // Create user
-      const newUser = await storage.createUser({
+      // Create user with required defaults
+      const userData = {
         email,
         firstName,
         lastName,
         role,
         password: hashedPassword,
         programId: null,
-      });
+        yearLevel: null, // Will be set later by student
+        isRegular: true, // Default to regular student
+      };
+      
+      console.log("Creating user with data:", { ...userData, password: "[REDACTED]" });
+      const newUser = await storage.createUser(userData);
 
       // Create session
       const sessionUser = {
@@ -107,10 +113,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Signup error:", error);
+      console.error("Error stack:", error.stack);
+      console.error("Error message:", error.message);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid input data" });
+        return res.status(400).json({ message: "Invalid input data", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create account" });
+      res.status(500).json({ message: "Failed to create account", error: error.message });
     }
   });
 
@@ -1360,27 +1368,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Only students can access available exams" });
       }
 
-      // Determine which subjects the student can access
-      let subjectIds: string[] = [];
-      
-      // First check if student has an active study plan
-      const studyPlan = await storage.getStudyPlan(userId);
-      if (studyPlan && studyPlan.isActive) {
-        // Get subjects from study plan
-        const planSubjects = await storage.getStudyPlanSubjects(studyPlan.id);
-        subjectIds = planSubjects.map(ps => ps.subjectId);
-      } else if (!user.isRegular) {
-        // Irregular student - get assigned subjects
-        const assignments = await storage.getStudentAssignments(userId);
-        subjectIds = assignments.map((a: any) => a.subjectId);
-      }
-      // For regular students without a study plan, use yearLevel filter (no subjectIds)
-
-      // Fetch available exams with attempt metadata, filtering by program
+      // Fetch ALL available exams filtered only by program and year level
+      // This allows students to see all Pre-Tests and Post-Tests for their program/year
+      // Security: Still enforces program and year level boundaries
       const exams = await storage.getAvailableExams(
         userId,
         user.yearLevel || undefined,
-        subjectIds.length > 0 ? subjectIds : undefined,
+        undefined, // Don't filter by specific subjects - show all exams
         user.programId || undefined
       );
 
