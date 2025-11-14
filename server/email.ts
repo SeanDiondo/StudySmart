@@ -644,3 +644,227 @@ For security, this code will expire in 15 minutes.
     return false;
   }
 }
+
+export interface StudyPlanConfirmationData {
+  recipientEmail: string;
+  recipientName: string;
+  studyPlanTitle: string;
+  subjects: string[];
+  totalHoursPerWeek: number;
+  studyDays: string[];
+}
+
+export async function sendStudyPlanConfirmation(data: StudyPlanConfirmationData) {
+  try {
+    const { client, fromEmail } = await getUncachableResendClient();
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .container {
+              background-color: #ffffff;
+              border-radius: 8px;
+              padding: 30px;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+            }
+            .logo {
+              font-size: 24px;
+              font-weight: bold;
+              color: #2563eb;
+              margin-bottom: 10px;
+            }
+            .success {
+              background-color: #d1fae5;
+              border-left: 4px solid #10b981;
+              padding: 15px;
+              margin-bottom: 20px;
+              border-radius: 4px;
+            }
+            .success-title {
+              font-weight: bold;
+              color: #047857;
+              margin-bottom: 5px;
+            }
+            .detail-section {
+              background-color: #f9fafb;
+              border-radius: 6px;
+              padding: 20px;
+              margin: 20px 0;
+            }
+            .detail-row {
+              display: flex;
+              justify-content: space-between;
+              padding: 10px 0;
+              border-bottom: 1px solid #e5e7eb;
+            }
+            .detail-row:last-child {
+              border-bottom: none;
+            }
+            .detail-label {
+              font-weight: 600;
+              color: #6b7280;
+            }
+            .detail-value {
+              color: #111827;
+              font-weight: 500;
+            }
+            .subject-list {
+              background-color: #eff6ff;
+              border-radius: 6px;
+              padding: 15px;
+              margin: 15px 0;
+            }
+            .subject-item {
+              padding: 8px 0;
+              border-bottom: 1px solid #dbeafe;
+              display: flex;
+              align-items: center;
+            }
+            .subject-item:last-child {
+              border-bottom: none;
+            }
+            .subject-bullet {
+              width: 6px;
+              height: 6px;
+              background-color: #2563eb;
+              border-radius: 50%;
+              margin-right: 10px;
+            }
+            .cta-button {
+              display: inline-block;
+              background-color: #2563eb;
+              color: #ffffff;
+              text-decoration: none;
+              padding: 12px 24px;
+              border-radius: 6px;
+              font-weight: 600;
+              margin: 20px 0;
+              text-align: center;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 30px;
+              padding-top: 20px;
+              border-top: 1px solid #e5e7eb;
+              color: #6b7280;
+              font-size: 14px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="logo">CCIT Study Plan</div>
+              <p style="color: #6b7280; margin: 0;">Your Personalized Learning Assistant</p>
+            </div>
+            
+            <div class="success">
+              <div class="success-title">Study Plan Created Successfully!</div>
+              <div>Your personalized study schedule is ready</div>
+            </div>
+            
+            <h2 style="color: #111827;">Hello ${data.recipientName},</h2>
+            
+            <p>Great news! Your study plan has been created successfully. We'll send you email reminders 15 and 5 minutes before each of your scheduled study sessions.</p>
+            
+            <div class="detail-section">
+              <h3 style="margin-top: 0; color: #111827;">Plan Overview</h3>
+              <div class="detail-row">
+                <span class="detail-label">Study Plan</span>
+                <span class="detail-value">${data.studyPlanTitle}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Hours per Week</span>
+                <span class="detail-value">${data.totalHoursPerWeek} hours</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Study Days</span>
+                <span class="detail-value">${data.studyDays.join(', ')}</span>
+              </div>
+            </div>
+            
+            <h3 style="color: #111827;">Subjects</h3>
+            <div class="subject-list">
+              ${data.subjects.map(subject => `
+                <div class="subject-item">
+                  <div class="subject-bullet"></div>
+                  <span>${subject}</span>
+                </div>
+              `).join('')}
+            </div>
+            
+            <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px;">
+              <strong style="color: #92400e;">📧 Email Reminders</strong>
+              <p style="margin: 10px 0 0 0; color: #78350f;">You'll receive email reminders 15 and 5 minutes before each scheduled study session to help you stay on track!</p>
+            </div>
+            
+            <div class="footer">
+              <p>This is an automated message from CCIT Study Plan</p>
+              <p style="margin-top: 5px;">Ready to start your learning journey? Log in to access your study materials!</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    const textContent = `
+CCIT Study Plan - Study Plan Created Successfully!
+
+Hello ${data.recipientName},
+
+Great news! Your study plan has been created successfully. We'll send you email reminders 15 and 5 minutes before each of your scheduled study sessions.
+
+PLAN OVERVIEW
+Study Plan: ${data.studyPlanTitle}
+Hours per Week: ${data.totalHoursPerWeek} hours
+Study Days: ${data.studyDays.join(', ')}
+
+SUBJECTS
+${data.subjects.map(s => `• ${s}`).join('\n')}
+
+EMAIL REMINDERS
+You'll receive email reminders 15 and 5 minutes before each scheduled study session to help you stay on track!
+
+This is an automated message from CCIT Study Plan.
+Ready to start your learning journey? Log in to access your study materials!
+    `.trim();
+    
+    console.log(`Sending study plan confirmation to ${data.recipientEmail}`);
+    
+    const result = await client.emails.send({
+      from: fromEmail,
+      to: data.recipientEmail,
+      subject: `Study Plan Created: ${data.studyPlanTitle}`,
+      html: htmlContent,
+      text: textContent,
+    });
+    
+    if (result.error) {
+      console.error('ERROR: Resend API error:', JSON.stringify(result.error));
+      console.error('Failed to send study plan confirmation email');
+      return false;
+    }
+    
+    console.log(`Study plan confirmation sent successfully! Email ID:`, result.data?.id);
+    return true;
+  } catch (error: any) {
+    console.error('ERROR: Error sending study plan confirmation:', error);
+    return false;
+  }
+}

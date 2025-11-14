@@ -5,6 +5,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { generateQuiz, analyzePerformance, generateExamFromMaterials } from "./openai";
+import { sendStudyPlanConfirmation } from "./email";
 import {
   insertSubjectSchema,
   insertStudyPlanSchema,
@@ -691,6 +692,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
           studyPlanId: newPlan.id,
         });
       }
+
+      // Send confirmation email (async, don't block response)
+      (async () => {
+        try {
+          const user = await storage.getUser(userId);
+          if (!user || !user.email) {
+            console.log('User not found or has no email for study plan confirmation');
+            return;
+          }
+
+          // Get subject names
+          const subjectNames: string[] = [];
+          for (const subjectData of subjectsToCreate) {
+            const subject = await storage.getSubject(subjectData.subjectId);
+            if (subject) {
+              subjectNames.push(subject.name);
+            }
+          }
+
+          // Extract unique study days from availableTimeSlots
+          const studyDaysSet = new Set(
+            (newPlan.availableTimeSlots || []).map((slot: any) => slot.day)
+          );
+          const studyDays = Array.from(studyDaysSet);
+
+          await sendStudyPlanConfirmation({
+            recipientEmail: user.email,
+            recipientName: user.firstName || 'Student',
+            studyPlanTitle: 'Your Study Plan',
+            subjects: subjectNames,
+            totalHoursPerWeek: newPlan.hoursPerWeek,
+            studyDays: studyDays.length > 0 ? studyDays : ['To be scheduled'],
+          });
+        } catch (emailError) {
+          console.error('Error sending study plan confirmation email:', emailError);
+          // Don't fail the request if email fails
+        }
+      })();
 
       res.json(newPlan);
     } catch (error: any) {

@@ -10,7 +10,7 @@ import type { Quiz, Subject } from "@shared/schema";
 export default function Exams() {
   const { user } = useAuth();
 
-  const { data: availableExams, isLoading: examsLoading } = useQuery<Array<Quiz & { attemptCount: number; lastAttemptAt: Date | null }>>({
+  const { data: availableExams, isLoading: examsLoading } = useQuery<Array<Quiz & { attemptCount: number; lastAttemptAt: Date | null; preTestAttempted?: boolean }>>({
     queryKey: ['/api/exams/available'],
     enabled: !!user,
   });
@@ -207,15 +207,32 @@ export default function Exams() {
                         </div>
                       </CardContent>
                       <CardFooter>
-                        <Link href={`/quiz/${exam.id}`} className="w-full">
-                          <Button 
-                            className="w-full"
-                            variant={exam.attemptCount === 0 ? "default" : "secondary"}
-                            data-testid={`button-take-exam-${exam.id}`}
-                          >
-                            {exam.attemptCount === 0 ? 'Take Exam' : 'Retake Exam'}
-                          </Button>
-                        </Link>
+                        {exam.examType === 'post_test' && !exam.preTestAttempted ? (
+                          <div className="w-full">
+                            <Button 
+                              className="w-full"
+                              variant="secondary"
+                              disabled
+                              data-testid={`button-take-exam-${exam.id}`}
+                              title="You must take the corresponding Pre-Test before taking this Post-Test"
+                            >
+                              Take Pre-Test First
+                            </Button>
+                            <p className="text-xs text-muted-foreground mt-2 text-center">
+                              Complete the Pre-Test to unlock this exam
+                            </p>
+                          </div>
+                        ) : (
+                          <Link href={`/quiz/${exam.id}`} className="w-full">
+                            <Button 
+                              className="w-full"
+                              variant={exam.attemptCount === 0 ? "default" : "secondary"}
+                              data-testid={`button-take-exam-${exam.id}`}
+                            >
+                              {exam.attemptCount === 0 ? 'Take Exam' : 'Retake Exam'}
+                            </Button>
+                          </Link>
+                        )}
                       </CardFooter>
                     </Card>
                   );

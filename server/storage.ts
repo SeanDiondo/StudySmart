@@ -96,7 +96,7 @@ export interface IStorage {
   getQuiz(id: string): Promise<Quiz | undefined>;
   createQuiz(quiz: InsertQuiz): Promise<Quiz>;
   deleteQuiz(id: string): Promise<void>;
-  getAvailableExams(studentId: string, yearLevel?: string, subjectIds?: string[], programId?: string): Promise<Array<Quiz & { attemptCount: number; lastAttemptAt: Date | null }>>;
+  getAvailableExams(studentId: string, yearLevel?: string, subjectIds?: string[], programId?: string): Promise<Array<Quiz & { attemptCount: number; lastAttemptAt: Date | null; preTestAttempted?: boolean }>>;
   
   // Quiz Attempt operations
   getQuizAttempts(userId: string, quizId?: string): Promise<QuizAttempt[]>;
@@ -714,7 +714,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(quizzes.id, id));
   }
 
-  async getAvailableExams(studentId: string, yearLevel?: string, subjectIds?: string[], programId?: string): Promise<Array<Quiz & { attemptCount: number; lastAttemptAt: Date | null }>> {
+  async getAvailableExams(studentId: string, yearLevel?: string, subjectIds?: string[], programId?: string): Promise<Array<Quiz & { attemptCount: number; lastAttemptAt: Date | null; preTestAttempted?: boolean }>> {
     // Build conditions array
     const conditions: any[] = [
       sql`${quizzes.examType} IN ('pre_test', 'post_test')`,
@@ -762,12 +762,28 @@ export class DatabaseStorage implements IStorage {
       .where(and(...conditions))
       .groupBy(quizzes.id);
 
-    // Transform results to Quiz & { attemptCount, lastAttemptAt }
-    return results.map((row: any) => ({
+    // Transform results and add preTestAttempted flag for Post-Tests
+    const exams = results.map((row: any) => ({
       ...row.quiz,
       attemptCount: row.attemptCount || 0,
       lastAttemptAt: row.lastAttemptAt || null,
     }));
+
+    // For Post-Tests, check if corresponding Pre-Test has been attempted
+    for (const exam of exams) {
+      if (exam.examType === 'post_test') {
+        // Find corresponding Pre-Test (same subjectId and materialType)
+        const preTest = exams.find(e => 
+          e.examType === 'pre_test' && 
+          e.subjectId === exam.subjectId && 
+          e.materialType === exam.materialType
+        );
+        // Set flag based on whether Pre-Test has attempts
+        exam.preTestAttempted = preTest ? preTest.attemptCount > 0 : false;
+      }
+    }
+
+    return exams;
   }
 
   // Quiz Attempt operations
