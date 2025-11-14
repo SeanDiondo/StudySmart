@@ -71,7 +71,7 @@ export function NavHeader({ user }: NavHeaderProps) {
   return (
     <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4 md:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between">
+        <div className="flex h-16 items-center justify-between gap-4">
           {/* Logo */}
           <Link href={user.role === "student" ? "/dashboard" : "/admin/materials"}>
             <div className="flex items-center gap-2 cursor-pointer hover-elevate px-2 py-1 rounded-lg">
@@ -82,23 +82,23 @@ export function NavHeader({ user }: NavHeaderProps) {
             </div>
           </Link>
 
-          {/* Navigation Links */}
-          <nav className="hidden md:flex items-center gap-1">
-            {navLinks.map((link) => (
-              <Link key={link.href} href={link.href}>
-                <Button
-                  variant={location === link.href ? "secondary" : "ghost"}
-                  className="hover-elevate"
-                  data-testid={`link-nav-${link.label.toLowerCase()}`}
-                >
-                  {link.label}
-                </Button>
-              </Link>
-            ))}
-          </nav>
-
-          {/* Right Side - Theme Toggle & User Menu */}
+          {/* Right Side - Navigation, Theme Toggle & User Menu */}
           <div className="flex items-center gap-2">
+            {/* Navigation Links */}
+            <nav className="hidden md:flex items-center gap-1">
+              {navLinks.map((link) => (
+                <Link key={link.href} href={link.href}>
+                  <Button
+                    variant={location === link.href ? "secondary" : "ghost"}
+                    className="hover-elevate"
+                    data-testid={`link-nav-${link.label.toLowerCase()}`}
+                  >
+                    {link.label}
+                  </Button>
+                </Link>
+              ))}
+            </nav>
+
             <ThemeToggle />
 
             <DropdownMenu>
