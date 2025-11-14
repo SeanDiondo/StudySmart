@@ -104,11 +104,6 @@ export default function Login() {
               </Link>
             </div>
 
-            <div className="mt-4 p-3 bg-muted/50 rounded-md text-xs space-y-1">
-              <p className="font-semibold text-foreground">Test Credentials:</p>
-              <p className="text-muted-foreground">Student: student@test.com / Study123!</p>
-              <p className="text-muted-foreground">Admin: admin@test.com / Admin123!</p>
-            </div>
           </CardContent>
         </Card>
       </div>
