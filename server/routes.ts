@@ -79,7 +79,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       console.log("Creating user with data:", { ...userData, password: "[REDACTED]" });
-      const newUser = await storage.createUser(userData);
+      const newUser = await storage.upsertUser(userData);
 
       // Create session
       const sessionUser = {
