@@ -20,14 +20,19 @@ The system uses Neon PostgreSQL with tables for users, subjects, study plans, ma
 ### AI Integration
 OpenAI's GPT-5 model is integrated for dynamic quiz generation based on subject, difficulty, and question count, providing structured JSON output and performance analysis including insights and personalized recommendations.
 
-### Email Reminder System
-An automated email reminder system, utilizing Resend, sends personalized reminders 15 and 5 minutes before scheduled study sessions for active study plans.
+### Email System
+An automated email system, utilizing Resend, provides two key features:
+1. **Study Session Reminders**: Sends personalized reminders 15 and 5 minutes before scheduled study sessions for active study plans.
+2. **Study Plan Confirmations**: Sends confirmation emails when students create new study plans, including plan details, selected subjects, study hours per week, and scheduled days. Email sending is asynchronous and non-blocking, with errors logged but not affecting the user experience.
 
 ### Materials Organization
 Study materials are organized into subject-grouped sections on the Materials Library page, with alphabetical sorting and visual hierarchy, while preserving search and filter capabilities.
 
 ### AI-Generated Pre-Test/Post-Test System
 The platform includes an automated exam generation system for Pre-Tests and Post-Tests based on completed study materials. Materials are classified as "Midterm" or "Finals". Administrators mark material sets as "completed", triggering AI (GPT-5) to generate Pre-Tests (15 questions for baseline assessment) and Post-Tests (20 questions for comprehensive assessment) with detailed explanations. Exams are attributed to a dedicated "AI System" user. An "Undo Completion" feature allows archiving associated exams and reverting material set status. Students have an "Available Exams" dashboard filtered by program, year level, and study plan. Administrators access a Reports page with comprehensive exam analytics, including filtering by program, year level, exam type, material type, and subject, with color-coded score displays. Automated email notifications are sent to eligible students when new Pre-Tests and Post-Tests become available, ensuring program and year-level relevance. A dedicated student "Exams" page provides summary statistics, subject-grouped exam cards, and direct links for taking/retaking exams.
+
+### Pre-Test Gating System
+Post-Test exams are protected by an intelligent gating mechanism that requires students to complete the corresponding Pre-Test before accessing the Post-Test. The system matches exams by subject and material type (Midterm/Finals), and Post-Test buttons are disabled with explanatory messaging ("Take Pre-Test First" and "Complete the Pre-Test to unlock this exam") until the student has attempted the associated Pre-Test. This ensures proper learning progression and baseline assessment completion before comprehensive evaluation.
 
 ## External Dependencies
 
