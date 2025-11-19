@@ -31,6 +31,7 @@ import GenerateQuiz from "@/pages/generate-quiz";
 import Exams from "@/pages/exams";
 import ForgotPassword from "@/pages/forgot-password";
 import Profile from "@/pages/profile";
+import Architecture from "@/pages/architecture";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -90,6 +91,7 @@ function Router() {
                 <Route path="/materials">{() => <ProtectedRoute><MaterialsLibrary /></ProtectedRoute>}</Route>
                 <Route path="/exams">{() => <ProtectedRoute><Exams /></ProtectedRoute>}</Route>
                 <Route path="/profile">{() => <ProtectedRoute><Profile /></ProtectedRoute>}</Route>
+                <Route path="/architecture">{() => <ProtectedRoute><Architecture /></ProtectedRoute>}</Route>
                 <Route path="/admin/materials">{() => <ProtectedRoute><AdminMaterials /></ProtectedRoute>}</Route>
                 <Route path="/admin/subjects">{() => <ProtectedRoute><AdminSubjects /></ProtectedRoute>}</Route>
                 <Route path="/admin/users">{() => <ProtectedRoute><AdminUsers /></ProtectedRoute>}</Route>

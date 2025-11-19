@@ -9,6 +9,7 @@ import {
   Users,
   FolderOpen,
   FileBarChart,
+  Network,
 } from "lucide-react";
 import {
   Sidebar,
@@ -60,6 +61,11 @@ export function AppSidebar({ user }: AppSidebarProps) {
       url: "/performance",
       icon: BarChart3,
     },
+    {
+      title: "Architecture",
+      url: "/architecture",
+      icon: Network,
+    },
   ];
 
   const adminItems = [
@@ -82,6 +88,11 @@ export function AppSidebar({ user }: AppSidebarProps) {
       title: "Reports",
       url: "/admin/reports",
       icon: FileBarChart,
+    },
+    {
+      title: "Architecture",
+      url: "/architecture",
+      icon: Network,
     },
   ];
 
