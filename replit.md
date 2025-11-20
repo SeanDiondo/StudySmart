@@ -18,7 +18,7 @@ The backend is built with Express.js and TypeScript, using Drizzle ORM for Neon 
 The system uses Neon PostgreSQL with tables for users, subjects, study plans, materials, quizzes, and program management. Key design decisions include PostgreSQL enums, UUID primary keys, timestamp fields, JSONB fields, and foreign key relationships. Multi-program support is implemented, filtering content by degree program and year level. A subject validation system ensures data integrity for uploaded materials, allowing administrators to map or create subjects. Quizzes utilize soft delete for data preservation.
 
 ### AI Integration
-OpenAI's GPT-5 model is integrated for dynamic quiz generation based on subject, difficulty, and question count, providing structured JSON output and performance analysis including insights and personalized recommendations.
+OpenAI's GPT-5 model is integrated for dynamic quiz generation based on subject, difficulty, and question count, providing structured JSON output and performance analysis including insights and personalized recommendations. The quiz generation system implements intelligent duplicate prevention by fetching existing questions for the same subject/difficulty (for quizzes) or subject/materialType/examType (for Pre/Post-Tests) and passing them to the AI with explicit anti-duplication instructions. Prompts include requirements for randomized answer positions, diverse question types, and variety in difficulty levels to ensure unique, high-quality assessments.
 
 ### Email System
 An automated email system, utilizing Resend, provides two key features:
