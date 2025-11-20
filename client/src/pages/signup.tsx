@@ -3,7 +3,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Brain } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -13,7 +12,6 @@ export default function Signup() {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"student" | "admin">("student");
   const [isLoading, setIsLoading] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -26,7 +24,7 @@ export default function Signup() {
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstName, lastName, email, password, role }),
+        body: JSON.stringify({ firstName, lastName, email, password, role: "student" }),
       });
       
       const data = await response.json();
@@ -130,23 +128,6 @@ export default function Signup() {
                   data-testid="input-password"
                 />
                 <p className="text-xs text-muted-foreground">Minimum 8 characters</p>
-              </div>
-              <div className="space-y-2">
-                <Label>Account Type</Label>
-                <RadioGroup value={role} onValueChange={(value) => setRole(value as "student" | "admin")} data-testid="radiogroup-role">
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="student" id="student" data-testid="radio-student" />
-                    <Label htmlFor="student" className="font-normal cursor-pointer">
-                      Student - Access study plans and quizzes
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="admin" id="admin" data-testid="radio-admin" />
-                    <Label htmlFor="admin" className="font-normal cursor-pointer">
-                      Admin - Manage study materials
-                    </Label>
-                  </div>
-                </RadioGroup>
               </div>
               <Button type="submit" className="w-full" size="lg" disabled={isLoading} data-testid="button-signup-submit">
                 {isLoading ? "Creating Account..." : "Create Account"}
