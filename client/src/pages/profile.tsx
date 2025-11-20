@@ -54,6 +54,8 @@ export default function Profile() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      // Invalidate subjects to refresh available subjects when year level changes
+      queryClient.invalidateQueries({ queryKey: ["/api/subjects/for-student"] });
       setIsEditing(false);
       toast({
         title: "Success!",

@@ -215,8 +215,13 @@ export default function GenerateQuiz() {
                       </div>
                     </div>
                   ) : (
-                    <div className="text-sm text-muted-foreground">
-                      No materials available for this subject
+                    <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20" data-testid="alert-no-materials">
+                      <p className="text-sm font-medium text-yellow-600 dark:text-yellow-500">
+                        No study materials available for this subject yet
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        An administrator needs to upload study materials before you can generate quizzes for this subject.
+                      </p>
                     </div>
                   )}
                 </FormItem>
@@ -286,7 +291,7 @@ export default function GenerateQuiz() {
                 <Button
                   type="submit"
                   className="flex-1"
-                  disabled={generateMutation.isPending}
+                  disabled={generateMutation.isPending || materialsLoading || (!!selectedSubjectId && materials !== undefined && materials.length === 0)}
                   data-testid="button-generate-quiz"
                 >
                   {generateMutation.isPending ? (
