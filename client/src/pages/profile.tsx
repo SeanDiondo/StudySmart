@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { User, Mail, BookOpen, Calendar } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -20,6 +21,7 @@ export default function Profile() {
     firstName: "",
     lastName: "",
     email: "",
+    yearLevel: "1" as "1" | "2" | "3" | "4",
   });
 
   const { data: userData, isLoading } = useQuery<UserType>({
@@ -33,13 +35,21 @@ export default function Profile() {
         firstName: userData.firstName ?? "",
         lastName: userData.lastName ?? "",
         email: userData.email ?? "",
+        yearLevel: userData.yearLevel ?? "1",
       });
     }
   }, [userData]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const res = await apiRequest("PATCH", "/api/auth/user", data);
+      // Only send yearLevel for students
+      const payload = {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        ...(userData?.role === "student" && { yearLevel: data.yearLevel }),
+      };
+      const res = await apiRequest("PATCH", "/api/auth/user", payload);
       return await res.json();
     },
     onSuccess: () => {
@@ -70,6 +80,7 @@ export default function Profile() {
         firstName: userData.firstName ?? "",
         lastName: userData.lastName ?? "",
         email: userData.email ?? "",
+        yearLevel: userData.yearLevel ?? "1",
       });
     }
     setIsEditing(false);
@@ -160,6 +171,25 @@ export default function Profile() {
                   data-testid="input-email"
                 />
               </div>
+              {userData.role === "student" && (
+                <div className="space-y-2">
+                  <Label htmlFor="yearLevel">Year Level*</Label>
+                  <Select
+                    value={formData.yearLevel}
+                    onValueChange={(value: "1" | "2" | "3" | "4") => setFormData({ ...formData, yearLevel: value })}
+                  >
+                    <SelectTrigger id="yearLevel" data-testid="select-year-level">
+                      <SelectValue placeholder="Select year level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Year 1</SelectItem>
+                      <SelectItem value="2">Year 2</SelectItem>
+                      <SelectItem value="3">Year 3</SelectItem>
+                      <SelectItem value="4">Year 4</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="flex gap-2 justify-end pt-4">
                 <Button type="button" variant="outline" onClick={handleCancel} data-testid="button-cancel">
                   Cancel

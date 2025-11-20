@@ -259,16 +259,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { firstName, lastName, email } = req.body;
+      const { firstName, lastName, email, yearLevel } = req.body;
 
       if (!firstName || !lastName || !email) {
         return res.status(400).json({ message: "First name, last name, and email are required" });
+      }
+
+      // Validate yearLevel if provided
+      if (yearLevel && !["1", "2", "3", "4"].includes(yearLevel)) {
+        return res.status(400).json({ message: "Invalid year level. Must be 1, 2, 3, or 4" });
       }
 
       const updatedUser = await storage.updateUser(userId, {
         firstName,
         lastName,
         email,
+        ...(yearLevel && { yearLevel }),
       });
 
       res.json(updatedUser);
@@ -1070,7 +1076,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Download study material
+  // Download study material (MUST be before /api/study-materials/:id route)
   app.get("/api/study-materials/:id/download", isAuthenticated, async (req, res) => {
     try {
       const material = await storage.getStudyMaterial(req.params.id);
@@ -1135,6 +1141,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "File not found" });
       }
       res.status(500).json({ message: "Failed to download material" });
+    }
+  });
+
+  // Get single study material by ID (MUST be after /api/study-materials/:id/download)
+  app.get("/api/study-materials/:id", isAuthenticated, async (req, res) => {
+    try {
+      const material = await storage.getStudyMaterial(req.params.id);
+      if (!material) {
+        return res.status(404).json({ message: "Material not found" });
+      }
+      res.json(material);
+    } catch (error) {
+      console.error("Error fetching material:", error);
+      res.status(500).json({ message: "Failed to fetch material" });
     }
   });
 

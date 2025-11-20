@@ -26,6 +26,7 @@ import AdminSubjects from "@/pages/admin-subjects";
 import AdminUsers from "@/pages/admin-users";
 import AdminReports from "@/pages/admin-reports";
 import MaterialsLibrary from "@/pages/materials-library";
+import MaterialViewer from "@/pages/material-viewer";
 import AvailableQuizzes from "@/pages/available-quizzes";
 import GenerateQuiz from "@/pages/generate-quiz";
 import Exams from "@/pages/exams";
@@ -89,6 +90,7 @@ function Router() {
                 <Route path="/quiz/results/:id">{() => <ProtectedRoute><QuizResults /></ProtectedRoute>}</Route>
                 <Route path="/performance">{() => <ProtectedRoute><PerformanceDashboard /></ProtectedRoute>}</Route>
                 <Route path="/materials">{() => <ProtectedRoute><MaterialsLibrary /></ProtectedRoute>}</Route>
+                <Route path="/materials/:id">{() => <ProtectedRoute><MaterialViewer /></ProtectedRoute>}</Route>
                 <Route path="/exams">{() => <ProtectedRoute><Exams /></ProtectedRoute>}</Route>
                 <Route path="/profile">{() => <ProtectedRoute><Profile /></ProtectedRoute>}</Route>
                 <Route path="/architecture">{() => <ProtectedRoute><Architecture /></ProtectedRoute>}</Route>

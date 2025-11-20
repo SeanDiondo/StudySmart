@@ -10,10 +10,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, Download, Search } from "lucide-react";
+import { FileText, Download, Search, Eye } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { Link } from "wouter";
 import type { StudyMaterial, Subject } from "@shared/schema";
 
 export default function MaterialsLibrary() {
@@ -154,16 +155,29 @@ export default function MaterialsLibrary() {
                           <span>{material.uploadedAt ? new Date(material.uploadedAt).toLocaleDateString() : 'N/A'}</span>
                         </div>
 
-                        <Button 
-                          className="w-full" 
-                          asChild
-                          data-testid={`button-download-${material.id}`}
-                        >
-                          <a href={`/api/study-materials/${material.id}/download`} download={material.fileName}>
-                            <Download className="h-4 w-4 mr-2" />
-                            Download
-                          </a>
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button 
+                            className="flex-1" 
+                            variant="outline"
+                            asChild
+                            data-testid={`button-view-${material.id}`}
+                          >
+                            <Link href={`/materials/${material.id}`}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              View
+                            </Link>
+                          </Button>
+                          <Button 
+                            className="flex-1" 
+                            asChild
+                            data-testid={`button-download-${material.id}`}
+                          >
+                            <a href={`/api/study-materials/${material.id}/download`} download={material.fileName}>
+                              <Download className="h-4 w-4 mr-2" />
+                              Download
+                            </a>
+                          </Button>
+                        </div>
                       </CardContent>
                     </Card>
                   ))}
