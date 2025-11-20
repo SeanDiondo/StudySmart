@@ -1494,7 +1494,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const materialContext = materials.map(m => `${m.title}: ${m.description}`).join("\n");
 
       // Fetch existing quizzes for this subject and difficulty to avoid duplicate questions
-      const existingQuizzes = await storage.getQuizzesBySubject(subjectId);
+      const existingQuizzes = await storage.getQuizzes(undefined, subjectId);
       const existingQuestions = existingQuizzes
         .filter(q => q.difficulty === difficulty && !q.isArchived)
         .flatMap(q => q.questions.map((question: any) => question.questionText));
