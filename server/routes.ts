@@ -1207,6 +1207,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: m.description || undefined
       }));
 
+      // Fetch existing exams for this subject and material type to avoid duplicate questions
+      const existingExams = await storage.getQuizzesBySubject(subjectId);
+      const existingPreTestQuestions = existingExams
+        .filter(q => q.examType === 'pre_test' && q.materialType === materialType && !q.isArchived)
+        .flatMap(q => q.questions.map((question: any) => question.questionText));
+      
+      const existingPostTestQuestions = existingExams
+        .filter(q => q.examType === 'post_test' && q.materialType === materialType && !q.isArchived)
+        .flatMap(q => q.questions.map((question: any) => question.questionText));
+
       // Generate Pre-Test and Post-Test IN PARALLEL (cuts time in half!)
       console.log(`Generating Pre-Test and Post-Test for ${subject.name} (${materialType}) in parallel...`);
       const [preTestResult, postTestResult] = await Promise.allSettled([
@@ -1214,13 +1224,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           subject.name,
           materialType as "midterm" | "finals",
           "pre_test",
-          materialsForAI
+          materialsForAI,
+          existingPreTestQuestions
         ),
         generateExamFromMaterials(
           subject.name,
           materialType as "midterm" | "finals",
           "post_test",
-          materialsForAI
+          materialsForAI,
+          existingPostTestQuestions
         )
       ]);
 
@@ -1461,7 +1473,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const materialContext = materials.map(m => `${m.title}: ${m.description}`).join("\n");
 
-      const quizData = await generateQuiz(subject.name, difficulty, questionCount, materialContext);
+      // Fetch existing quizzes for this subject and difficulty to avoid duplicate questions
+      const existingQuizzes = await storage.getQuizzesBySubject(subjectId);
+      const existingQuestions = existingQuizzes
+        .filter(q => q.difficulty === difficulty && !q.isArchived)
+        .flatMap(q => q.questions.map((question: any) => question.questionText));
+
+      const quizData = await generateQuiz(subject.name, difficulty, questionCount, materialContext, existingQuestions);
 
       const quiz = await storage.createQuiz({
         userId,

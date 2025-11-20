@@ -18,9 +18,13 @@ function isRateLimitError(error: any): boolean {
   );
 }
 
-export async function generateQuiz(subject: string, difficulty: string, questionCount: number, materialContext?: string) {
+export async function generateQuiz(subject: string, difficulty: string, questionCount: number, materialContext?: string, existingQuestions?: string[]) {
+  const existingQuestionsContext = existingQuestions && existingQuestions.length > 0
+    ? `\n\nIMPORTANT: These questions already exist. DO NOT generate similar or duplicate questions:\n${existingQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}\n\nGenerate completely NEW and DIFFERENT questions that cover different aspects of the topic.`
+    : '';
+
   const prompt = `Generate ${questionCount} multiple choice questions for a quiz on "${subject}" at ${difficulty} difficulty level.
-${materialContext ? `Use this context from study materials: ${materialContext}` : ''}
+${materialContext ? `Use this context from study materials: ${materialContext}` : ''}${existingQuestionsContext}
 
 Return a JSON object with this exact structure:
 {
@@ -35,7 +39,13 @@ Return a JSON object with this exact structure:
   ]
 }
 
-Make the questions educational and test real understanding. Include clear explanations for each answer.`;
+IMPORTANT REQUIREMENTS:
+1. Make each question unique and diverse - avoid similar wording or topics
+2. Randomize the order of options for each question (don't always put correct answer first)
+3. Ensure questions test different concepts and aspects of the subject
+4. Make the questions educational and test real understanding
+5. Include clear explanations for each answer
+6. Each question should be distinct and cover different learning objectives`;
 
   try {
     const response = await pRetry(
@@ -123,7 +133,8 @@ export async function generateExamFromMaterials(
   subjectName: string,
   materialType: "midterm" | "finals",
   examType: "pre_test" | "post_test",
-  materials: { title: string; description?: string }[]
+  materials: { title: string; description?: string }[],
+  existingQuestions?: string[]
 ) {
   const examTypeLabel = examType === "pre_test" ? "Pre-Test" : "Post-Test";
   const materialTypeLabel = materialType === "midterm" ? "Midterm" : "Finals";
@@ -137,9 +148,13 @@ export async function generateExamFromMaterials(
       }).join('\n')}`
     : '';
 
+  const existingQuestionsContext = existingQuestions && existingQuestions.length > 0
+    ? `\n\nCRITICAL: The following questions already exist for this subject and material type. You MUST generate completely DIFFERENT questions that do NOT overlap with these:\n${existingQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}\n\nGenerate NEW questions covering different aspects, concepts, and applications.`
+    : '';
+
   const prompt = `Generate a comprehensive ${examTypeLabel} for "${subjectName}" (${materialTypeLabel} period) with ${questionCount} multiple choice questions.
 
-${materialsContext}
+${materialsContext}${existingQuestionsContext}
 
 ${examType === "pre_test" 
   ? "This is a PRE-TEST designed to assess students' baseline knowledge BEFORE studying the materials. Questions should cover fundamental concepts and prerequisite knowledge that students should have or will learn from the materials." 
@@ -158,7 +173,14 @@ Return a JSON object with this exact structure:
   ]
 }
 
-Make the questions educational, varied in difficulty, and test real understanding. Include detailed explanations for each answer.`;
+CRITICAL REQUIREMENTS:
+1. Each question MUST be unique - no duplicate or similar questions
+2. Randomize the position of the correct answer (don't always put it first or in the same position)
+3. Cover diverse topics and different difficulty levels within the material
+4. Each question should test a different concept or skill
+5. Make the questions educational, varied in difficulty, and test real understanding
+6. Include detailed explanations for each answer
+7. Ensure variety in question types (recall, application, analysis, synthesis)`;
 
   try {
     const response = await pRetry(
