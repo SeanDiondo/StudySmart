@@ -234,6 +234,15 @@ export class DatabaseStorage implements IStorage {
     await db.delete(subjects).where(eq(subjects.id, id));
   }
 
+  async getSubjectProgramMappings(): Promise<Array<{ subjectId: string; programId: string }>> {
+    return await db
+      .select({
+        subjectId: subjectPrograms.subjectId,
+        programId: subjectPrograms.programId,
+      })
+      .from(subjectPrograms);
+  }
+
   // Student Subject Assignment operations
   async getStudentAssignments(studentId: string): Promise<StudentSubjectAssignment[]> {
     const assignments = await db
