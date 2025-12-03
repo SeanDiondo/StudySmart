@@ -1228,7 +1228,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
 
       // Fetch existing exams for this subject and material type to avoid duplicate questions
-      const existingExams = await storage.getQuizzesBySubject(subjectId);
+      const existingExams = await storage.getQuizzes(undefined, subjectId);
       const existingPreTestQuestions = existingExams
         .filter(q => q.examType === 'pre_test' && q.materialType === materialType && !q.isArchived)
         .flatMap(q => q.questions.map((question: any) => question.questionText));
