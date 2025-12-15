@@ -62,6 +62,26 @@ export function AppSidebar({ user }: AppSidebarProps) {
     },
   ];
 
+  // Professor: Manage materials, subjects, quizzes, and view reports
+  const professorItems = [
+    {
+      title: "Materials",
+      url: "/admin/materials",
+      icon: FolderOpen,
+    },
+    {
+      title: "Subjects",
+      url: "/admin/subjects",
+      icon: BookOpen,
+    },
+    {
+      title: "Reports",
+      url: "/admin/reports",
+      icon: FileBarChart,
+    },
+  ];
+
+  // Admin: Full system access (includes user management)
   const adminItems = [
     {
       title: "Materials",
@@ -85,7 +105,20 @@ export function AppSidebar({ user }: AppSidebarProps) {
     },
   ];
 
-  const items = user.role === "student" ? studentItems : adminItems;
+  const getNavigationItems = () => {
+    switch (user.role) {
+      case "student":
+        return studentItems;
+      case "professor":
+        return professorItems;
+      case "admin":
+        return adminItems;
+      default:
+        return studentItems;
+    }
+  };
+
+  const items = getNavigationItems();
 
   return (
     <Sidebar collapsible="icon">

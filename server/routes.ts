@@ -36,8 +36,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     lastName: z.string().min(1),
     email: z.string().email(),
     password: z.string().min(8),
-    role: z.enum(["student", "admin"]),
+    role: z.enum(["student", "professor", "admin"]),
   });
+
+  // Helper: Check if user can manage content (professors and admins)
+  const canManageContent = (role: string | null | undefined) => 
+    role === "admin" || role === "professor";
+  
+  // Helper: Check if user is admin only
+  const isAdmin = (role: string | null | undefined) => role === "admin";
 
   const forgotPasswordSchema = z.object({
     email: z.string().email(),
@@ -315,7 +322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId } = req.params;
       const { role } = req.body;
       
-      if (!role || !["student", "admin"].includes(role)) {
+      if (!role || !["student", "professor", "admin"].includes(role)) {
         return res.status(400).json({ message: "Invalid role" });
       }
 
@@ -514,8 +521,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/objects/upload", isAuthenticated, async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.claims.sub);
-      if (user?.role !== "admin") {
-        return res.status(403).json({ message: "Only admins can upload files" });
+      if (!canManageContent(user?.role)) {
+        return res.status(403).json({ message: "Only professors and admins can upload files" });
       }
       
       const objectStorageService = new ObjectStorageService();
@@ -591,8 +598,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/subjects", isAuthenticated, async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.claims.sub);
-      if (user?.role !== "admin") {
-        return res.status(403).json({ message: "Only admins can create subjects" });
+      if (!canManageContent(user?.role)) {
+        return res.status(403).json({ message: "Only professors and admins can create subjects" });
       }
 
       const validatedData = insertSubjectSchema.parse(req.body);
@@ -607,8 +614,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/subjects/:id", isAuthenticated, async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.claims.sub);
-      if (user?.role !== "admin") {
-        return res.status(403).json({ message: "Only admins can update subjects" });
+      if (!canManageContent(user?.role)) {
+        return res.status(403).json({ message: "Only professors and admins can update subjects" });
       }
 
       const subject = await storage.updateSubject(req.params.id, req.body);
@@ -622,8 +629,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/subjects/:id", isAuthenticated, async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.claims.sub);
-      if (user?.role !== "admin") {
-        return res.status(403).json({ message: "Only admins can delete subjects" });
+      if (!canManageContent(user?.role)) {
+        return res.status(403).json({ message: "Only professors and admins can delete subjects" });
       }
 
       await storage.deleteSubject(req.params.id);
@@ -863,8 +870,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/materials", isAuthenticated, async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.claims.sub);
-      if (user?.role !== "admin") {
-        return res.status(403).json({ message: "Only admins can upload materials" });
+      if (!canManageContent(user?.role)) {
+        return res.status(403).json({ message: "Only professors and admins can upload materials" });
       }
 
       const { subjectName, programId, yearLevel, ...materialData } = req.body;
@@ -919,8 +926,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/study-materials", isAuthenticated, async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.claims.sub);
-      if (user?.role !== "admin") {
-        return res.status(403).json({ message: "Only admins can upload materials" });
+      if (!canManageContent(user?.role)) {
+        return res.status(403).json({ message: "Only professors and admins can upload materials" });
       }
 
       const { subjectName, programId, yearLevel, ...materialData } = req.body;
@@ -974,8 +981,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/materials/:id", isAuthenticated, async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.claims.sub);
-      if (user?.role !== "admin") {
-        return res.status(403).json({ message: "Only admins can update materials" });
+      if (!canManageContent(user?.role)) {
+        return res.status(403).json({ message: "Only professors and admins can update materials" });
       }
 
       // Validate and sanitize input
@@ -997,8 +1004,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/materials/:id", isAuthenticated, async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.claims.sub);
-      if (user?.role !== "admin") {
-        return res.status(403).json({ message: "Only admins can delete materials" });
+      if (!canManageContent(user?.role)) {
+        return res.status(403).json({ message: "Only professors and admins can delete materials" });
       }
 
       await storage.deleteStudyMaterial(req.params.id);
@@ -1013,8 +1020,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/study-materials/:id", isAuthenticated, async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.claims.sub);
-      if (user?.role !== "admin") {
-        return res.status(403).json({ message: "Only admins can delete materials" });
+      if (!canManageContent(user?.role)) {
+        return res.status(403).json({ message: "Only professors and admins can delete materials" });
       }
 
       await storage.deleteStudyMaterial(req.params.id);
@@ -1029,8 +1036,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/materials/pending", isAuthenticated, async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.claims.sub);
-      if (user?.role !== "admin") {
-        return res.status(403).json({ message: "Only admins can view pending materials" });
+      if (!canManageContent(user?.role)) {
+        return res.status(403).json({ message: "Only professors and admins can view pending materials" });
       }
 
       const pendingMaterials = await storage.getPendingMaterials();
@@ -1049,8 +1056,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/materials/:id/resolve", isAuthenticated, async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.claims.sub);
-      if (user?.role !== "admin") {
-        return res.status(403).json({ message: "Only admins can resolve materials" });
+      if (!canManageContent(user?.role)) {
+        return res.status(403).json({ message: "Only professors and admins can resolve materials" });
       }
 
       const { subjectId } = resolveMaterialSchema.parse(req.body);
@@ -1162,8 +1169,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/material-sets/status", isAuthenticated, async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.claims.sub);
-      if (user?.role !== "admin") {
-        return res.status(403).json({ message: "Only admins can access material set status" });
+      if (!canManageContent(user?.role)) {
+        return res.status(403).json({ message: "Only professors and admins can access material set status" });
       }
 
       const { subjectId, materialType } = req.query;
@@ -1192,8 +1199,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/material-sets/mark-complete", isAuthenticated, async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.claims.sub);
-      if (user?.role !== "admin") {
-        return res.status(403).json({ message: "Only admins can mark material sets as complete" });
+      if (!canManageContent(user?.role)) {
+        return res.status(403).json({ message: "Only professors and admins can mark material sets as complete" });
       }
 
       const { subjectId, materialType } = req.body;
@@ -1399,8 +1406,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/material-sets/undo", isAuthenticated, async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.claims.sub);
-      if (user?.role !== "admin") {
-        return res.status(403).json({ message: "Only admins can undo material set completion" });
+      if (!canManageContent(user?.role)) {
+        return res.status(403).json({ message: "Only professors and admins can undo material set completion" });
       }
 
       const { subjectId, materialType } = req.body;
@@ -1516,17 +1523,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin Quiz endpoints
+  // Admin/Professor Quiz endpoints
   app.get("/api/admin/quizzes", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
-      if (!user || user.role !== "admin") {
-        return res.status(403).json({ message: "Admin access required" });
+      if (!canManageContent(user?.role)) {
+        return res.status(403).json({ message: "Professor or Admin access required" });
       }
 
-      // Get all quizzes for admins (no userId filter)
+      // Get all quizzes for admins/professors (no userId filter)
       const quizzes = await storage.getAllQuizzes();
       res.json(quizzes);
     } catch (error) {
@@ -1535,14 +1542,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get filtered exams for admin reports with server-side filtering
+  // Get filtered exams for admin/professor reports with server-side filtering
   app.get("/api/admin/exams/filtered", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
-      if (!user || user.role !== "admin") {
-        return res.status(403).json({ message: "Admin access required" });
+      if (!canManageContent(user?.role)) {
+        return res.status(403).json({ message: "Professor or Admin access required" });
       }
 
       const { programId, yearLevel, examType, materialType, subjectId } = req.query;
@@ -1567,11 +1574,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
-      if (!user || user.role !== "admin") {
-        return res.status(403).json({ message: "Admin access required" });
+      if (!canManageContent(user?.role)) {
+        return res.status(403).json({ message: "Professor or Admin access required" });
       }
 
-      // Get all quiz attempts for admins (no userId filter)
+      // Get all quiz attempts for admins/professors (no userId filter)
       const attempts = await storage.getAllQuizAttempts();
       res.json(attempts);
     } catch (error) {
