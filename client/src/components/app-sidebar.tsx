@@ -9,6 +9,7 @@ import {
   Users,
   FolderOpen,
   FileBarChart,
+  TrendingUp,
 } from "lucide-react";
 import {
   Sidebar,
@@ -102,6 +103,11 @@ export function AppSidebar({ user }: AppSidebarProps) {
       title: "Reports",
       url: "/admin/reports",
       icon: FileBarChart,
+    },
+    {
+      title: "Analytics",
+      url: "/admin/analytics",
+      icon: TrendingUp,
     },
   ];
 

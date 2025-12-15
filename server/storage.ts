@@ -10,6 +10,7 @@ import {
   quizzes,
   quizAttempts,
   studentSubjectAssignments,
+  programs,
   type User,
   type UpsertUser,
   type Subject,
@@ -28,6 +29,7 @@ import {
   type InsertQuizAttempt,
   type StudentSubjectAssignment,
   type InsertStudentSubjectAssignment,
+  type Program,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
@@ -44,6 +46,9 @@ export interface IStorage {
   updateUserStudentStatus(id: string, yearLevel: "1" | "2" | "3" | "4", isRegular: boolean): Promise<User>;
   deleteUser(id: string): Promise<void>;
   getStudentsBySubject(subjectId: string): Promise<User[]>;
+  
+  // Program operations
+  getPrograms(): Promise<Program[]>;
   
   // Subject operations
   getSubjects(): Promise<Subject[]>;
@@ -206,6 +211,11 @@ export class DatabaseStorage implements IStorage {
     }
     
     return eligibleStudents;
+  }
+
+  // Program operations
+  async getPrograms(): Promise<Program[]> {
+    return await db.select().from(programs);
   }
 
   // Subject operations

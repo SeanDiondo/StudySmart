@@ -25,6 +25,7 @@ import AdminMaterials from "@/pages/admin-materials";
 import AdminSubjects from "@/pages/admin-subjects";
 import AdminUsers from "@/pages/admin-users";
 import AdminReports from "@/pages/admin-reports";
+import AdminAnalytics from "@/pages/admin-analytics";
 import MaterialsLibrary from "@/pages/materials-library";
 import MaterialViewer from "@/pages/material-viewer";
 import AvailableQuizzes from "@/pages/available-quizzes";
@@ -98,6 +99,7 @@ function Router() {
                 <Route path="/admin/subjects">{() => <ProtectedRoute><AdminSubjects /></ProtectedRoute>}</Route>
                 <Route path="/admin/users">{() => <ProtectedRoute><AdminUsers /></ProtectedRoute>}</Route>
                 <Route path="/admin/reports">{() => <ProtectedRoute><AdminReports /></ProtectedRoute>}</Route>
+                <Route path="/admin/analytics">{() => <ProtectedRoute><AdminAnalytics /></ProtectedRoute>}</Route>
                 
                 {/* Catch-all */}
                 <Route path="/:rest*" component={NotFound} />

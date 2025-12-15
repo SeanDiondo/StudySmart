@@ -14,7 +14,10 @@ import {
   insertQuizSchema,
   insertQuizAttemptSchema,
   type StudyPlan,
+  studyPlans as studyPlansTable,
+  studyPlanSubjects as studyPlanSubjectsTable,
 } from "@shared/schema";
+import { db } from "./db";
 import bcrypt from "bcrypt";
 import { z } from "zod";
 import {
@@ -324,6 +327,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching students by subject:", error);
       res.status(500).json({ message: "Failed to fetch students by subject" });
+    }
+  });
+
+  // Admin-only endpoint to get subject analytics (enrollment statistics)
+  app.get("/api/admin/analytics/subjects", isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      
+      if (!isAdmin(currentUser?.role)) {
+        return res.status(403).json({ message: "Only admins can view analytics" });
+      }
+
+      const subjects = await storage.getSubjects();
+      const programs = await storage.getPrograms();
+      const allUsers = await storage.getAllUsers();
+      const students = allUsers.filter(u => u.role === "student");
+      const studyPlans = await db.select().from(studyPlansTable);
+      const studyPlanSubjectsData = await db.select().from(studyPlanSubjectsTable);
+      const subjectProgramMappings = await storage.getSubjectProgramMappings();
+      
+      // Get enrollment counts per subject
+      const subjectEnrollments = await Promise.all(
+        subjects.map(async (subject) => {
+          const enrolledStudents = await storage.getStudentsBySubject(subject.id);
+          
+          // Count how many study plans include this subject
+          const studyPlanCount = studyPlanSubjectsData.filter(sps => sps.subjectId === subject.id).length;
+          
+          // Get programs this subject is linked to
+          const linkedPrograms = subjectProgramMappings
+            .filter(sp => sp.subjectId === subject.id)
+            .map(sp => sp.programId);
+          
+          return {
+            id: subject.id,
+            name: subject.name,
+            yearLevel: subject.yearLevel,
+            subjectType: subject.subjectType,
+            programIds: linkedPrograms,
+            enrolledCount: enrolledStudents.length,
+            studyPlanCount,
+          };
+        })
+      );
+
+      // Group by program
+      const programStats = programs.map((program: { id: string; code: string; name: string }) => {
+        const programSubjects = subjectEnrollments.filter(s => s.programIds.includes(program.id));
+        const totalEnrolled = programSubjects.reduce((sum, s) => sum + s.enrolledCount, 0);
+        return {
+          programId: program.id,
+          programCode: program.code,
+          programName: program.name,
+          subjectCount: programSubjects.length,
+          totalEnrolled,
+        };
+      });
+
+      // Group by year level (yearLevel is a string enum "1", "2", "3", "4")
+      const yearLevelStats = ["1", "2", "3", "4"].map(year => {
+        const yearSubjects = subjectEnrollments.filter(s => s.yearLevel === year);
+        const totalEnrolled = yearSubjects.reduce((sum, s) => sum + s.enrolledCount, 0);
+        const studentsInYear = students.filter(s => s.yearLevel === year).length;
+        return {
+          yearLevel: parseInt(year),
+          subjectCount: yearSubjects.length,
+          totalEnrolled,
+          studentCount: studentsInYear,
+        };
+      });
+
+      // Group by subject type
+      const typeStats = {
+        major: subjectEnrollments.filter(s => s.subjectType === "major"),
+        minor: subjectEnrollments.filter(s => s.subjectType === "minor"),
+      };
+
+      res.json({
+        subjects: subjectEnrollments,
+        programStats,
+        yearLevelStats,
+        typeStats: {
+          major: {
+            count: typeStats.major.length,
+            totalEnrolled: typeStats.major.reduce((sum, s) => sum + s.enrolledCount, 0),
+          },
+          minor: {
+            count: typeStats.minor.length,
+            totalEnrolled: typeStats.minor.reduce((sum, s) => sum + s.enrolledCount, 0),
+          },
+        },
+        overview: {
+          totalSubjects: subjects.length,
+          totalStudents: students.length,
+          totalStudyPlans: studyPlans.length,
+          activeStudyPlans: studyPlans.filter(sp => sp.isActive).length,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching subject analytics:", error);
+      res.status(500).json({ message: "Failed to fetch subject analytics" });
     }
   });
 
