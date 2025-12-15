@@ -263,12 +263,12 @@ export default function GenerateQuiz() {
                 name="questionCount"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Number of Questions (5-20)</FormLabel>
+                    <FormLabel>Number of Questions (5-50)</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
                         min={5}
-                        max={20}
+                        max={50}
                         placeholder="10"
                         data-testid="input-question-count"
                         {...field}
