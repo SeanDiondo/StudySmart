@@ -23,7 +23,7 @@ export default function AdminSubjects() {
     name: "",
     description: "",
     yearLevel: "1" as "1" | "2" | "3" | "4",
-    isDefault: false,
+    subjectType: "major" as "major" | "minor",
   });
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
@@ -45,7 +45,7 @@ export default function AdminSubjects() {
         description: "Subject created successfully",
       });
       setIsCreateDialogOpen(false);
-      setSubjectForm({ name: "", description: "", yearLevel: "1", isDefault: false });
+      setSubjectForm({ name: "", description: "", yearLevel: "1", subjectType: "major" });
     },
     onError: (error: any) => {
       toast({
@@ -69,7 +69,7 @@ export default function AdminSubjects() {
       });
       setIsEditDialogOpen(false);
       setEditingSubject(null);
-      setSubjectForm({ name: "", description: "", yearLevel: "1", isDefault: false });
+      setSubjectForm({ name: "", description: "", yearLevel: "1", subjectType: "major" });
     },
     onError: (error: any) => {
       toast({
@@ -111,7 +111,7 @@ export default function AdminSubjects() {
       name: subject.name,
       description: subject.description || "",
       yearLevel: subject.yearLevel || "1",
-      isDefault: subject.isDefault,
+      subjectType: subject.subjectType || "major",
     });
     setIsEditDialogOpen(true);
   };
@@ -201,16 +201,20 @@ export default function AdminSubjects() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="isDefault"
-                  checked={subjectForm.isDefault}
-                  onChange={(e) => setSubjectForm({ ...subjectForm, isDefault: e.target.checked })}
-                  className="h-4 w-4"
-                  data-testid="checkbox-is-default"
-                />
-                <Label htmlFor="isDefault">Mark as default CCIT subject</Label>
+              <div className="space-y-2">
+                <Label htmlFor="subjectType">Subject Type*</Label>
+                <Select
+                  value={subjectForm.subjectType}
+                  onValueChange={(value) => setSubjectForm({ ...subjectForm, subjectType: value as "major" | "minor" })}
+                >
+                  <SelectTrigger data-testid="select-subject-type">
+                    <SelectValue placeholder="Select subject type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="major">Major Subject</SelectItem>
+                    <SelectItem value="minor">Minor Subject</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="flex gap-2 justify-end">
                 <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
@@ -271,8 +275,8 @@ export default function AdminSubjects() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <span className={`text-xs px-2 py-1 rounded ${subject.isDefault ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
-                        {subject.isDefault ? "Default CCIT" : "Custom"}
+                      <span className={`text-xs px-2 py-1 rounded ${subject.subjectType === "major" ? "bg-primary/10 text-primary" : "bg-secondary/50 text-secondary-foreground"}`}>
+                        {subject.subjectType === "major" ? "Major" : "Minor"}
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
@@ -352,16 +356,20 @@ export default function AdminSubjects() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="edit-isDefault"
-                checked={subjectForm.isDefault}
-                onChange={(e) => setSubjectForm({ ...subjectForm, isDefault: e.target.checked })}
-                className="h-4 w-4"
-                data-testid="checkbox-edit-is-default"
-              />
-              <Label htmlFor="edit-isDefault">Mark as default CCIT subject</Label>
+            <div className="space-y-2">
+              <Label htmlFor="edit-subjectType">Subject Type*</Label>
+              <Select
+                value={subjectForm.subjectType}
+                onValueChange={(value) => setSubjectForm({ ...subjectForm, subjectType: value as "major" | "minor" })}
+              >
+                <SelectTrigger data-testid="select-edit-subject-type">
+                  <SelectValue placeholder="Select subject type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="major">Major Subject</SelectItem>
+                  <SelectItem value="minor">Minor Subject</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex gap-2 justify-end">
               <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>

@@ -37,6 +37,20 @@ Post-Test exams are protected by an intelligent gating mechanism that requires s
 ### Student Profile Management
 Students can manage their own profile information including first name, last name, email, and year level (1-4) through the profile page. Year level selection is restricted to student accounts only and is validated on both frontend and backend. Profile updates automatically refresh the user session and invalidate cached queries (including subject lists) to ensure consistency across the application. When a student changes their year level, the available subjects automatically update to match their new year level through cache invalidation.
 
+### Subject Classification
+Subjects are classified as either "Major" or "Minor" through the `subjectType` field. This classification replaces the previous priority system and allows for clearer organization of curriculum subjects. Administrators can set the subject type when creating or editing subjects through the Subject Management interface.
+
+### Irregular Student Support
+The system supports irregular students with flexible subject selection. Administrators can mark students as "irregular" through the User Management page, after which they can assign specific subjects from any year level to that student. Irregular students see only their assigned subjects rather than year-level-filtered subjects.
+
+### Study Schedule Quick Presets
+The study schedule builder includes quick preset buttons for efficient scheduling:
+- Day selection: "Weekdays", "Weekends", "All Days" for quick day selection
+- Time presets: "Early Morning (6-9 AM)", "Morning (9 AM-12 PM)", "Afternoon (1-5 PM)", "Evening (6-9 PM)", "Night (9-11 PM)" for common study time blocks
+
+### Quiz Auto-Redirect
+After successfully generating a quiz, students are automatically redirected to the quiz interface to take it immediately, providing a streamlined workflow from generation to completion.
+
 ## External Dependencies
 
 ### Third-Party Services

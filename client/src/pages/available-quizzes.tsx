@@ -8,10 +8,10 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { SelectQuiz, SelectSubject } from "@shared/schema";
+import type { Quiz, Subject } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 
-type QuizWithSubject = SelectQuiz & { subject?: Pick<SelectSubject, "name"> };
+type QuizWithSubject = Quiz & { subject?: Pick<Subject, "name"> };
 
 export default function AvailableQuizzes() {
   const { isAuthenticated } = useAuth();
@@ -22,7 +22,7 @@ export default function AvailableQuizzes() {
     enabled: isAuthenticated,
   });
 
-  const { data: subjects } = useQuery<SelectSubject[]>({
+  const { data: subjects } = useQuery<Subject[]>({
     queryKey: ["/api/subjects"],
     enabled: isAuthenticated,
   });

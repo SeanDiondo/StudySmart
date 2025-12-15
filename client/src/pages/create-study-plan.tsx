@@ -140,6 +140,24 @@ export default function CreateStudyPlan() {
     );
   };
 
+  // Quick preset handlers
+  const selectWeekdays = () => {
+    setBuilderDays(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]);
+  };
+
+  const selectWeekends = () => {
+    setBuilderDays(["Saturday", "Sunday"]);
+  };
+
+  const selectAllDays = () => {
+    setBuilderDays([...daysOfWeek]);
+  };
+
+  const applyQuickTimePreset = (startTime: string, endTime: string) => {
+    setBuilderStartTime(startTime);
+    setBuilderEndTime(endTime);
+  };
+
   const handleAddTimeRange = () => {
     // Validation
     if (builderDays.length === 0) {
@@ -358,8 +376,42 @@ export default function CreateStudyPlan() {
                 </h4>
 
                 {/* Day Checkboxes */}
-                <div>
-                  <Label className="text-sm mb-2 block">Select Days</Label>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Select Days</Label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={selectWeekdays}
+                        className="text-xs h-7"
+                        data-testid="button-select-weekdays"
+                      >
+                        Weekdays
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={selectWeekends}
+                        className="text-xs h-7"
+                        data-testid="button-select-weekends"
+                      >
+                        Weekends
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={selectAllDays}
+                        className="text-xs h-7"
+                        data-testid="button-select-all-days"
+                      >
+                        All Days
+                      </Button>
+                    </div>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {daysOfWeek.map((day) => (
                       <Button
@@ -375,6 +427,58 @@ export default function CreateStudyPlan() {
                         {day.substring(0, 3)}
                       </Button>
                     ))}
+                  </div>
+                </div>
+
+                {/* Quick Time Presets */}
+                <div className="space-y-2">
+                  <Label className="text-sm">Quick Time Presets</Label>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => applyQuickTimePreset("06:00", "09:00")}
+                      data-testid="button-preset-early-morning"
+                    >
+                      Early Morning (6-9 AM)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => applyQuickTimePreset("09:00", "12:00")}
+                      data-testid="button-preset-morning"
+                    >
+                      Morning (9 AM-12 PM)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => applyQuickTimePreset("13:00", "17:00")}
+                      data-testid="button-preset-afternoon"
+                    >
+                      Afternoon (1-5 PM)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => applyQuickTimePreset("18:00", "21:00")}
+                      data-testid="button-preset-evening"
+                    >
+                      Evening (6-9 PM)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => applyQuickTimePreset("21:00", "23:00")}
+                      data-testid="button-preset-night"
+                    >
+                      Night (9-11 PM)
+                    </Button>
                   </div>
                 </div>
 

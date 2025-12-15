@@ -88,13 +88,18 @@ export default function GenerateQuiz() {
       const res = await apiRequest("POST", "/api/quizzes/generate", payload);
       return await res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/quizzes"] });
       toast({
         title: "Quiz Generated!",
-        description: "Your AI-powered quiz has been created successfully.",
+        description: "Redirecting to your quiz...",
       });
-      setLocation("/quizzes");
+      // Auto-redirect to the quiz page to take it immediately
+      if (data?.id) {
+        setLocation(`/quiz/${data.id}`);
+      } else {
+        setLocation("/quizzes");
+      }
     },
     onError: (error: Error) => {
       toast({

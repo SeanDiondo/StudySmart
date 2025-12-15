@@ -11,6 +11,7 @@ export const yearLevelEnum = pgEnum("year_level", ["1", "2", "3", "4"]);
 export const materialTypeEnum = pgEnum("material_type", ["midterm", "finals"]);
 export const examTypeEnum = pgEnum("exam_type", ["quiz", "pre_test", "post_test"]);
 export const subjectValidationStatusEnum = pgEnum("subject_validation_status", ["valid", "pending", "invalid"]);
+export const subjectTypeEnum = pgEnum("subject_type", ["major", "minor"]);
 
 // Session storage table (required for Replit Auth)
 export const sessions = pgTable(
@@ -75,7 +76,8 @@ export const subjects = pgTable("subjects", {
   name: text("name").notNull(),
   description: text("description"),
   yearLevel: yearLevelEnum("year_level").default("1"), // Subject's year level (1-4)
-  isDefault: boolean("is_default").notNull().default(false), // true for CCIT standard subjects
+  subjectType: subjectTypeEnum("subject_type").notNull().default("major"), // major or minor subject
+  isDefault: boolean("is_default").notNull().default(false), // true for CCIT standard subjects (kept for backward compat)
   userId: varchar("user_id").references(() => users.id), // null for default subjects, user id for custom subjects
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -83,6 +85,9 @@ export const subjects = pgTable("subjects", {
 export const insertSubjectSchema = createInsertSchema(subjects).omit({
   id: true,
   createdAt: true,
+}).extend({
+  // Make subjectType optional so database default is used when not provided
+  subjectType: z.enum(["major", "minor"]).optional().default("major"),
 });
 
 export type InsertSubject = z.infer<typeof insertSubjectSchema>;
