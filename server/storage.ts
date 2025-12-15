@@ -38,9 +38,9 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
   upsertUser(user: UpsertUser): Promise<User>;
-  createTestUser(user: { email: string; password: string; firstName: string; lastName: string; role: "student" | "admin" }): Promise<User>;
-  updateUserRole(id: string, role: "student" | "admin"): Promise<User>;
-  updateUser(id: string, data: Partial<Pick<User, 'firstName' | 'lastName' | 'email'>>): Promise<User>;
+  createTestUser(user: { email: string; password: string; firstName: string; lastName: string; role: "student" | "professor" | "admin" }): Promise<User>;
+  updateUserRole(id: string, role: "student" | "professor" | "admin"): Promise<User>;
+  updateUser(id: string, data: Partial<Pick<User, 'firstName' | 'lastName' | 'email' | 'password'>>): Promise<User>;
   updateUserStudentStatus(id: string, yearLevel: "1" | "2" | "3" | "4", isRegular: boolean): Promise<User>;
   deleteUser(id: string): Promise<void>;
   
@@ -122,7 +122,7 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(users);
   }
 
-  async createTestUser(userData: { email: string; password: string; firstName: string; lastName: string; role: "student" | "admin" }): Promise<User> {
+  async createTestUser(userData: { email: string; password: string; firstName: string; lastName: string; role: "student" | "professor" | "admin" }): Promise<User> {
     const [user] = await db.insert(users).values(userData).returning();
     return user;
   }
@@ -142,7 +142,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUserRole(id: string, role: "student" | "admin"): Promise<User> {
+  async updateUserRole(id: string, role: "student" | "professor" | "admin"): Promise<User> {
     const [user] = await db
       .update(users)
       .set({ role, updatedAt: new Date() })
@@ -151,7 +151,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUser(id: string, data: Partial<Pick<User, 'firstName' | 'lastName' | 'email'>>): Promise<User> {
+  async updateUser(id: string, data: Partial<Pick<User, 'firstName' | 'lastName' | 'email' | 'password'>>): Promise<User> {
     const [user] = await db
       .update(users)
       .set({ ...data, updatedAt: new Date() })

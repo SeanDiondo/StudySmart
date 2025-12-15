@@ -1,7 +1,12 @@
 # CCIT Study Plan - Personalized Learning System
 
 ## Overview
-The CCIT Study Plan is an AI-powered educational platform designed for CCIT students, supporting multiple degree programs (BSIT, BSCS). Its purpose is to provide personalized study planning, adaptive quiz generation, and intelligent performance analytics to enhance the learning experience. The system caters to Students, who create study plans, access materials, take quizzes, and track progress, and Administrators, who manage educational content and program assignments. The project aims to deliver an advanced, AI-driven learning platform with strong market potential in the education technology sector.
+The CCIT Study Plan is an AI-powered educational platform designed for CCIT students, supporting multiple degree programs (BSIT, BSCS). Its purpose is to provide personalized study planning, adaptive quiz generation, and intelligent performance analytics to enhance the learning experience. The system supports three user roles:
+- **Students**: Create study plans, access materials, take quizzes, and track progress
+- **Professors/Instructors**: Manage materials, subjects, and view reports
+- **Administrators**: Full system access including user management and all professor capabilities
+
+The project aims to deliver an advanced, AI-driven learning platform with strong market potential in the education technology sector.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.

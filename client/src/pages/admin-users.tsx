@@ -45,7 +45,7 @@ export default function AdminUsers() {
   });
 
   const updateRoleMutation = useMutation({
-    mutationFn: async ({ userId, role }: { userId: string; role: "student" | "admin" }) => {
+    mutationFn: async ({ userId, role }: { userId: string; role: "student" | "professor" | "admin" }) => {
       const res = await apiRequest("PATCH", `/api/admin/users/${userId}/role`, { role });
       return await res.json();
     },
@@ -364,6 +364,7 @@ export default function AdminUsers() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="student">Student</SelectItem>
+                            <SelectItem value="professor">Professor</SelectItem>
                             <SelectItem value="admin">Admin</SelectItem>
                           </SelectContent>
                         </Select>
