@@ -19,7 +19,7 @@ import { useState, useEffect } from "react";
 const quizGenerationSchema = z.object({
   subjectId: z.string().min(1, "Please select a subject"),
   difficulty: z.enum(["easy", "medium", "hard"]),
-  questionCount: z.coerce.number().min(5, "Minimum 5 questions").max(20, "Maximum 20 questions"),
+  questionCount: z.coerce.number().min(5, "Minimum 5 questions").max(50, "Maximum 50 questions"),
   materialIds: z.array(z.string()).optional(),
 });
 
