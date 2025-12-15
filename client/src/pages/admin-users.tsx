@@ -302,11 +302,19 @@ export default function AdminUsers() {
                         <div className="flex items-center gap-2">
                           {user.role === "admin" ? (
                             <Shield className="h-4 w-4 text-primary" />
+                          ) : user.role === "professor" ? (
+                            <Shield className="h-4 w-4 text-blue-500" />
                           ) : (
                             <UserIcon className="h-4 w-4 text-muted-foreground" />
                           )}
-                          <span className={`text-xs px-2 py-1 rounded ${user.role === "admin" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
-                            {user.role === "admin" ? "Admin" : "Student"}
+                          <span className={`text-xs px-2 py-1 rounded ${
+                            user.role === "admin" 
+                              ? "bg-primary/10 text-primary" 
+                              : user.role === "professor"
+                                ? "bg-blue-500/10 text-blue-500"
+                                : "bg-muted text-muted-foreground"
+                          }`}>
+                            {user.role === "admin" ? "Admin" : user.role === "professor" ? "Professor" : "Student"}
                           </span>
                         </div>
                       </TableCell>

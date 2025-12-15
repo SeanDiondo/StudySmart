@@ -383,7 +383,6 @@ function StudyPlanCard({ plan, subjects, planNumber }: { plan: StudyPlan; subjec
               {planSubjects.map((planSubject: any) => (
                 <Badge key={planSubject.id} variant="outline" className="text-xs" data-testid={`subject-badge-${planSubject.id}`}>
                   {planSubject.subject?.name || planSubject.subjectId}
-                  {planSubject.priority && ` (Priority: ${planSubject.priority})`}
                 </Badge>
               ))}
             </div>

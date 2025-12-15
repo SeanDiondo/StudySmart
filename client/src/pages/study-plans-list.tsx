@@ -209,7 +209,6 @@ function StudyPlanCard({
               {planSubjects.map((planSubject: any) => (
                 <Badge key={planSubject.id} variant="outline" className="text-xs">
                   {getSubjectName(planSubject.subjectId)}
-                  {planSubject.priority && ` (Priority: ${planSubject.priority})`}
                 </Badge>
               ))}
             </div>
