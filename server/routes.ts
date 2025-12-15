@@ -309,6 +309,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin-only endpoint to get students by subject
+  app.get("/api/admin/students-by-subject/:subjectId", isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      
+      if (!isAdmin(currentUser?.role)) {
+        return res.status(403).json({ message: "Only admins can view students by subject" });
+      }
+
+      const { subjectId } = req.params;
+      const students = await storage.getStudentsBySubject(subjectId);
+      res.json(students);
+    } catch (error) {
+      console.error("Error fetching students by subject:", error);
+      res.status(500).json({ message: "Failed to fetch students by subject" });
+    }
+  });
+
   // Admin-only endpoint to update any user's role
   app.patch("/api/admin/users/:userId/role", isAuthenticated, async (req: any, res) => {
     try {

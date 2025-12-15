@@ -43,6 +43,7 @@ export interface IStorage {
   updateUser(id: string, data: Partial<Pick<User, 'firstName' | 'lastName' | 'email' | 'password'>>): Promise<User>;
   updateUserStudentStatus(id: string, yearLevel: "1" | "2" | "3" | "4", isRegular: boolean): Promise<User>;
   deleteUser(id: string): Promise<void>;
+  getStudentsBySubject(subjectId: string): Promise<User[]>;
   
   // Subject operations
   getSubjects(): Promise<Subject[]>;
@@ -171,6 +172,40 @@ export class DatabaseStorage implements IStorage {
 
   async deleteUser(id: string): Promise<void> {
     await db.delete(users).where(eq(users.id, id));
+  }
+
+  async getStudentsBySubject(subjectId: string): Promise<User[]> {
+    // Get the subject to determine program and year level
+    const subject = await this.getSubject(subjectId);
+    if (!subject) return [];
+    
+    // Get all students
+    const allStudents = await db.select().from(users).where(eq(users.role, "student"));
+    
+    // Filter students based on subject criteria
+    const eligibleStudents: User[] = [];
+    
+    for (const student of allStudents) {
+      // Check if irregular student with this subject assigned
+      if (!student.isRegular) {
+        const assignments = await db.select()
+          .from(studentSubjectAssignments)
+          .where(and(
+            eq(studentSubjectAssignments.studentId, student.id),
+            eq(studentSubjectAssignments.subjectId, subjectId)
+          ));
+        if (assignments.length > 0) {
+          eligibleStudents.push(student);
+        }
+      } else {
+        // Regular students - check year level and program
+        if (subject.yearLevel && student.yearLevel !== subject.yearLevel) continue;
+        if (subject.programId && student.programId !== subject.programId) continue;
+        eligibleStudents.push(student);
+      }
+    }
+    
+    return eligibleStudents;
   }
 
   // Subject operations

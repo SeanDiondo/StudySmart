@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Search, Users as UsersIcon, Shield, User as UserIcon, Pencil, Trash2, BookOpen, X } from "lucide-react";
+import { Search, Users as UsersIcon, Shield, User as UserIcon, Pencil, Trash2, BookOpen, X, Download } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,6 +21,7 @@ export default function AdminUsers() {
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [managingSubjectsUserId, setManagingSubjectsUserId] = useState<string | null>(null);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>("");
+  const [filterSubjectId, setFilterSubjectId] = useState<string>("all");
   const [editFormData, setEditFormData] = useState({
     firstName: "",
     lastName: "",
@@ -231,12 +232,60 @@ export default function AdminUsers() {
   const assignedSubjectIds = new Set(studentAssignments?.map(a => a.subject.id) || []);
   const availableSubjects = allSubjects?.filter(s => !assignedSubjectIds.has(s.id)) || [];
 
-  const filteredUsers = (users || []).filter(
+  // Query for students by subject filter
+  const { data: studentsBySubject } = useQuery<User[]>({
+    queryKey: ["/api/admin/students-by-subject", filterSubjectId],
+    enabled: isAuthenticated && filterSubjectId !== "all",
+  });
+
+  // Get the list of users to display based on filter
+  const displayUsers = filterSubjectId === "all" ? (users || []) : (studentsBySubject || []);
+
+  const filteredUsers = displayUsers.filter(
     (user) =>
       user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.lastName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Export students to CSV
+  const exportStudentsToCSV = () => {
+    const studentsToExport = filteredUsers.filter(u => u.role === "student");
+    if (studentsToExport.length === 0) {
+      toast({
+        title: "No students to export",
+        description: "There are no students matching the current filter.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const subjectName = filterSubjectId === "all" 
+      ? "All_Students" 
+      : allSubjects?.find(s => s.id === filterSubjectId)?.name?.replace(/\s+/g, "_") || "Subject";
+
+    const headers = ["Name", "Email", "Year Level", "Status", "Joined"];
+    const rows = studentsToExport.map(student => [
+      `${student.firstName || ""} ${student.lastName || ""}`.trim() || student.email?.split("@")[0] || "Unknown",
+      student.email || "",
+      student.yearLevel ? `Year ${student.yearLevel}` : "N/A",
+      student.isRegular ? "Regular" : "Irregular",
+      student.createdAt ? new Date(student.createdAt).toLocaleDateString() : "N/A",
+    ]);
+
+    const csvContent = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `${subjectName}_Students_${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+
+    toast({
+      title: "Export successful",
+      description: `Exported ${studentsToExport.length} students to CSV.`,
+    });
+  };
 
   return (
     <div className="container mx-auto px-4 py-8 space-y-6">
@@ -256,15 +305,42 @@ export default function AdminUsers() {
         <CardHeader>
           <CardTitle>User List</CardTitle>
           <CardDescription>All registered users in the system</CardDescription>
-          <div className="flex items-center gap-2 mt-4">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search users..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="max-w-sm"
-              data-testid="input-search-users"
-            />
+          <div className="flex flex-wrap items-center gap-4 mt-4">
+            <div className="flex items-center gap-2">
+              <Search className="h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search users..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="max-w-sm"
+                data-testid="input-search-users"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm text-muted-foreground whitespace-nowrap">Filter by Subject:</Label>
+              <Select value={filterSubjectId} onValueChange={setFilterSubjectId}>
+                <SelectTrigger className="w-[200px]" data-testid="select-filter-subject">
+                  <SelectValue placeholder="All Students" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Students</SelectItem>
+                  {allSubjects?.map((subject) => (
+                    <SelectItem key={subject.id} value={subject.id}>
+                      {subject.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportStudentsToCSV}
+              data-testid="button-export-students"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export Students
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
