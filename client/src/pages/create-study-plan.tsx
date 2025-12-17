@@ -576,151 +576,44 @@ export default function CreateStudyPlan() {
                 </Button>
               </div>
 
-              {/* Google Calendar-Style Timeline */}
-              <div className="border border-border rounded-lg bg-background overflow-hidden">
-                <div className="grid grid-cols-[80px_repeat(7,1fr)] border-b border-border">
-                  {/* Empty corner */}
-                  <div className="bg-muted"></div>
-                  {/* Day headers */}
-                  {daysOfWeek.map((day, index) => (
-                    <div
-                      key={day}
-                      className={`bg-muted p-3 text-center font-semibold text-sm ${
-                        index < daysOfWeek.length - 1 ? 'border-r border-border' : ''
-                      }`}
-                      data-testid={`header-${day.toLowerCase()}`}
-                    >
-                      <div className="hidden md:block">{day}</div>
-                      <div className="md:hidden">{day.substring(0, 3)}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Timeline view */}
-                <div className="overflow-y-auto max-h-[600px]">
-                  <div className="grid grid-cols-[80px_repeat(7,1fr)] relative">
-                    {(() => {
-                      const displayHours = Array.from({ length: 24 }, (_, i) => i);
-                      const slotHeight = 60; // Height in pixels for each hour
-                      const totalHeight = 24 * slotHeight; // Total height for 24 hours
-                      
-                      // Helper to detect overlapping events
-                      type ScheduleEvent = { id: string; day: string; startMinutes: number; endMinutes: number; label: string };
-                      const getEventColumns = (dayEvents: ScheduleEvent[]) => {
-                        // Sort events by start time
-                        const sorted = [...dayEvents].sort((a, b) => a.startMinutes - b.startMinutes);
-                        const columns: ScheduleEvent[][] = [];
-                        
-                        sorted.forEach(event => {
-                          // Find a column where this event doesn't overlap
-                          let placed = false;
-                          for (const column of columns) {
-                            const overlaps = column.some(e => 
-                              event.startMinutes < e.endMinutes && event.endMinutes > e.startMinutes
-                            );
-                            if (!overlaps) {
-                              column.push(event);
-                              placed = true;
-                              break;
-                            }
-                          }
-                          if (!placed) {
-                            columns.push([event]);
-                          }
-                        });
-                        
-                        return columns;
-                      };
+              {/* Compact Weekly Schedule Grid */}
+              {scheduleEvents.length > 0 && (
+                <div className="border border-border rounded-lg bg-background overflow-hidden">
+                  <div className="grid grid-cols-7 gap-px bg-border">
+                    {daysOfWeek.map((day) => {
+                      const dayEvents = scheduleEvents.filter(e => e.day === day);
+                      const hasEvents = dayEvents.length > 0;
                       
                       return (
-                        <>
-                          {/* Time labels column */}
-                          <div className="sticky left-0 z-10">
-                            {displayHours.map((hour) => (
+                        <div
+                          key={day}
+                          className="bg-background p-2 min-h-[80px]"
+                          data-testid={`day-column-${day.toLowerCase()}`}
+                        >
+                          <div className={`text-xs font-semibold mb-2 text-center ${hasEvents ? 'text-primary' : 'text-muted-foreground'}`}>
+                            {day.substring(0, 3)}
+                          </div>
+                          <div className="space-y-1">
+                            {dayEvents.map((event) => (
                               <div
-                                key={hour}
-                                className="bg-muted p-2 flex items-start justify-end text-xs text-muted-foreground font-medium border-r border-b border-border h-[60px]"
+                                key={event.id}
+                                className="bg-primary/10 text-primary text-[10px] leading-tight rounded px-1.5 py-1 truncate"
+                                title={event.label}
+                                data-testid={`event-chip-${event.id}`}
                               >
-                                {formatTimeDisplay(`${String(hour).padStart(2, '0')}:00`)}
+                                {formatTimeDisplay(minutesToTime(event.startMinutes)).replace(' ', '')}
                               </div>
                             ))}
+                            {!hasEvents && (
+                              <div className="text-[10px] text-muted-foreground/50 text-center">-</div>
+                            )}
                           </div>
-                          
-                          {/* Day columns with events */}
-                          {daysOfWeek.map((day, colIndex) => {
-                            const dayEvents = scheduleEvents.filter(e => e.day === day);
-                            const eventColumns = getEventColumns(dayEvents);
-                            const numColumns = eventColumns.length;
-                            
-                            return (
-                              <div
-                                key={day}
-                                className={`relative ${
-                                  colIndex < daysOfWeek.length - 1 ? 'border-r border-border' : ''
-                                }`}
-                                style={{ height: `${totalHeight}px` }}
-                              >
-                                {/* Hour grid lines */}
-                                {displayHours.map((hour) => (
-                                  <div
-                                    key={hour}
-                                    className="absolute inset-x-0 border-b border-border"
-                                    style={{
-                                      top: `${hour * slotHeight}px`,
-                                      height: `${slotHeight}px`,
-                                    }}
-                                    data-testid={`timecell-${day.toLowerCase()}-${hour}`}
-                                  />
-                                ))}
-                                
-                                {/* Event bars */}
-                                {eventColumns.map((column, columnIndex) => 
-                                  column.map(event => {
-                                    const top = (event.startMinutes / 60) * slotHeight;
-                                    const height = ((event.endMinutes - event.startMinutes) / 60) * slotHeight;
-                                    const leftPercent = (columnIndex / numColumns) * 100;
-                                    const widthPercent = 100 / numColumns;
-                                    
-                                    return (
-                                      <div
-                                        key={event.id}
-                                        className="absolute bg-primary text-primary-foreground rounded-md p-2 text-xs overflow-hidden shadow-sm"
-                                        style={{
-                                          top: `${top}px`,
-                                          height: `${height}px`,
-                                          left: `${leftPercent}%`,
-                                          width: `calc(${widthPercent}% - 4px)`,
-                                        }}
-                                        data-testid={`event-bar-${event.id}`}
-                                      >
-                                        <div className="font-semibold truncate">{event.label}</div>
-                                      </div>
-                                    );
-                                  })
-                                )}
-                              </div>
-                            );
-                          })}
-                        </>
+                        </div>
                       );
-                    })()}
+                    })}
                   </div>
                 </div>
-              </div>
-
-              {/* Instructions */}
-              <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-2">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-primary" />
-                  <h4 className="font-semibold text-sm">How to use:</h4>
-                </div>
-                <ul className="text-sm text-muted-foreground space-y-1 ml-7">
-                  <li>• Use the form above to add time ranges for multiple days</li>
-                  <li>• The timeline below shows your schedule as horizontal bars (like Google Calendar)</li>
-                  <li>• Each time range appears as a colored bar on the selected days</li>
-                  <li>• Remove time slots using the X button in the "Added Time Slots" list</li>
-                </ul>
-              </div>
+              )}
 
               <div className="flex items-center justify-between pt-4 border-t gap-3">
                 <Button
